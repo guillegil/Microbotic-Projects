@@ -14,8 +14,8 @@
 xQueueHandle xMotorsQueue;
 struct Speed
 {
-    int32_t right;
-    int32_t left;
+    float right;
+    float left;
 };
 
 
@@ -25,9 +25,12 @@ static portTASK_FUNCTION(MotorsTask, pvParameters)
     float right_duty_cycle;
     float left_duty_cycle;
 
+    PWMGenEnable(PWM1_BASE, PWM_GEN_3);
+
     while(1)
     {
         xQueueReceive(xMotorsQueue, &speed, portMAX_DELAY);
+        // TODO: truncar velocidades superiores a la máxima
 
         right_duty_cycle = MAX_MOTORS_DUTYCYCLE - (MAX_FORWARD_SPEED - speed.right) / (MAX_FORWARD_SPEED - MAX_BACKWARD_SPEED) * (MAX_MOTORS_DUTYCYCLE - MIN_MOTORS_DUTYCYCLE);
         left_duty_cycle = MAX_MOTORS_DUTYCYCLE - (MAX_FORWARD_SPEED - speed.left) / (MAX_FORWARD_SPEED - MAX_BACKWARD_SPEED) * (MAX_MOTORS_DUTYCYCLE - MIN_MOTORS_DUTYCYCLE);
@@ -35,7 +38,6 @@ static portTASK_FUNCTION(MotorsTask, pvParameters)
                          (uint32_t)((float)PWMGenPeriodGet(PWM1_BASE, PWM_GEN_3) * right_duty_cycle));
         PWMPulseWidthSet(PWM1_BASE, PWM_OUT_LEFT_MOTOR,
                              (uint32_t)((float)PWMGenPeriodGet(PWM1_BASE, PWM_GEN_3) * left_duty_cycle));
-        PWMGenEnable(PWM1_BASE, PWM_GEN_3);
     }
 }
 
@@ -43,8 +45,8 @@ static portTASK_FUNCTION(BrainTask, pvParameters)
 {
     struct Speed speed;
 
-    speed.right = MAX_FORWARD_SPEED;
-    speed.left = MAX_BACKWARD_SPEED;
+    speed.right = 0.0;
+    speed.left = 0.0;
     xQueueSend(xMotorsQueue, &speed, portMAX_DELAY);
 
     SysCtlSleep();
