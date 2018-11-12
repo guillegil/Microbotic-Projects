@@ -16,6 +16,8 @@
 #include "drivers/buttons.h"     // TIVA: Funciones API manejo de botones
 #include "FreeRTOS.h"            // FreeRTOS: definiciones generales
 #include "task.h"                // FreeRTOS: definiciones relacionadas con tareas
+#include "driverlib/adc.h"
+
 
 #include "skybot_tasks.h"
 #include "config.h"
@@ -31,6 +33,7 @@ int32_t i32Estado_led=0;
 // The error routine that is called if the driver library encounters an error.
 //
 //*****************************************************************************
+
 #ifdef DEBUG
 void
 __error__(char *pcFilename, unsigned long ulLine)
@@ -92,6 +95,16 @@ void system_init()
     MAP_GPIOPinTypeUART(GPIO_PORTA_BASE, GPIO_PIN_0 | GPIO_PIN_1);
     UARTStdioConfig(0, 115200, SysCtlClockGet());
 
+
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_ADC0); // Enable ADC0
+    while(!SysCtlPeripheralReady(SYSCTL_PERIPH_ADC0))  // Wait for ADC0 to be ready
+    {
+    }
+
+    ADCSequenceConfigure(ADC0_BASE, 0, ADC_TRIGGER_PROCESSOR, 0);
+    ADCSequenceStepConfigure(ADC0_BASE, 0, 0, ADC_CTL_IE | ADC_CTL_END | ADC_CTL_CH0); // Interrupt + Last seq + channel 0 selected
+    ADCSequenceEnable(ADC0_BASE, 0);
+    ADCIntEnable(ADC0_BASE, 0);
     //
     // Configure PWM
     //
@@ -174,4 +187,12 @@ int main(void)
     while(1)
     {
     }
+}
+
+void ISR_ProximitySensor(void)
+{
+    uint32_t data_buff;
+
+    ADCSequenceDataGet(ADC0_BASE, 0, &data_buff);
+    UARTprintf("Data Rec: %d", data_buff);
 }

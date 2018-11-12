@@ -12,12 +12,19 @@
 
 
 xQueueHandle xMotorsQueue;
+xQueueHandle SensorsQueue;
+
 struct Speed
 {
     float right;
     float left;
 };
 
+struct SensorData
+{
+    uint8_t id;
+    uint32_t data;
+};
 
 static portTASK_FUNCTION(MotorsTask, pvParameters)
 {
@@ -53,17 +60,38 @@ static portTASK_FUNCTION(BrainTask, pvParameters)
 }
 
 
+//static portTASK_FUNCTION(SensorTask, pvParameters)
+//{
+//    struct Speed speed;
+//
+//    speed.right = 0.0;
+//    speed.left = 0.0;
+//    xQueueSend(xMotorsQueue, &speed, portMAX_DELAY);
+//
+//    SysCtlSleep();
+//}
+
+
+
 void init_tasks()
 {
     xMotorsQueue = xQueueCreate(2, sizeof(struct Speed));
+    //SensorsQueue = xQueueCreate(1, sizeof(struct SensorData))
 
     if((xTaskCreate(BrainTask, "BrainTask", 256, NULL, tskIDLE_PRIORITY + 1, NULL)) != pdTRUE)
     {
         while(1);
     }
 
+//    if((xTaskCreate(SensorTask, "Sensor task", 256, NULL, tskIDLE_PRIORITY + 1, NULL)) != pdTRUE)
+//    {
+//        while(1);
+//    }
+
     if((xTaskCreate(MotorsTask, "MotorsTask", 256, NULL, tskIDLE_PRIORITY + 1, NULL)) != pdTRUE)
     {
         while(1);
     }
+
+
 }
