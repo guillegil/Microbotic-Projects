@@ -1,5 +1,6 @@
 
-#include <skybot_tasks.h>
+#include "skybot_tasks.h"
+
 #include <stdint.h>
 #include <stdbool.h>
 #include "driverlib/sysctl.h"
@@ -11,12 +12,8 @@
 #include "config.h"
 
 
-xQueueHandle xMotorsQueue;
-struct Speed
-{
-    float right;
-    float left;
-};
+
+extern void vUARTTask( void *pvParameters );
 
 
 static portTASK_FUNCTION(MotorsTask, pvParameters)
@@ -50,12 +47,19 @@ static portTASK_FUNCTION(BrainTask, pvParameters)
     xQueueSend(xMotorsQueue, &speed, portMAX_DELAY);
 
     SysCtlSleep();
+
+    vTaskDelete(NULL);
 }
 
 
 void init_tasks()
 {
     xMotorsQueue = xQueueCreate(2, sizeof(struct Speed));
+
+    if((xTaskCreate(vUARTTask, (portCHAR *)"Uart", 512,NULL,tskIDLE_PRIORITY + 1, NULL) != pdTRUE))
+    {
+        while(1);
+    }
 
     if((xTaskCreate(BrainTask, "BrainTask", 256, NULL, tskIDLE_PRIORITY + 1, NULL)) != pdTRUE)
     {
