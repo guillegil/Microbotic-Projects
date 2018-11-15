@@ -17,7 +17,8 @@
 #include "FreeRTOS.h"            // FreeRTOS: definiciones generales
 #include "task.h"                // FreeRTOS: definiciones relacionadas con tareas
 #include "driverlib/adc.h"
-
+#include "driverlib/timer.h"
+#include "utils/cpu_usage.h"
 
 #include "skybot_tasks.h"
 #include "config.h"
@@ -73,6 +74,55 @@ void vApplicationIdleHook(xTaskHandle *pxTask, signed char *pcTaskName)
 // Configure the system clock and initialize all needed peripherals.
 //
 //*****************************************************************************
+void ADCConfig(void)
+{
+      SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER5);
+      while(!SysCtlPeripheralReady(SYSCTL_PERIPH_TIMER5))    // Wait for TIMER5 to be ready
+      {
+      }
+
+      SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_TIMER5);
+
+      TimerClockSourceSet(TIMER5_BASE,TIMER_CLOCK_SYSTEM);
+      TimerConfigure(TIMER5_BASE, TIMER_CFG_PERIODIC);
+      TimerLoadSet(TIMER5_BASE, TIMER_A, SysCtlClockGet() - 1);
+
+
+       SysCtlPeripheralEnable(SYSCTL_PERIPH_ADC0);         // Enable ADC0
+       while(!SysCtlPeripheralReady(SYSCTL_PERIPH_ADC0))    // Wait for ADC0 to be ready
+       {
+       }
+
+       SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_ADC0);
+
+       SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOE);
+       while(!SysCtlPeripheralReady(SYSCTL_PERIPH_GPIOE))    // Wait for GPIO_PE to be ready
+       {
+       }
+
+       SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_GPIOE);
+
+       GPIOPinTypeADC(GPIO_PORTE_BASE,GPIO_PIN_3);
+
+       ADCClockConfigSet(ADC0_BASE, ADC_CLOCK_RATE_FULL, 1);
+
+       ADCSequenceConfigure(ADC0_BASE, 1, ADC_TRIGGER_TIMER, 0);
+       TimerControlTrigger(TIMER5_BASE, TIMER_A, true);
+
+       ADCSequenceStepConfigure(ADC0_BASE, 1, 0, ADC_CTL_IE | ADC_CTL_END | ADC_CTL_CH0); // Interrupt + Last seq + channel 0 selected
+       ADCSequenceEnable(ADC0_BASE, 1);
+
+       ADCIntEnable(ADC0_BASE, 1);
+       ADCIntClear(ADC0_BASE,1);
+       IntPrioritySet(INT_ADC0SS1, configMAX_SYSCALL_INTERRUPT_PRIORITY);
+       IntEnable(INT_ADC0SS1);
+       IntMasterEnable();
+
+       TimerEnable(TIMER5_BASE, TIMER_A);
+}
+
+
+
 void system_init()
 {
     //
@@ -82,7 +132,7 @@ void system_init()
     SysCtlClockSet(SYSCTL_SYSDIV_5 | SYSCTL_USE_PLL | SYSCTL_XTAL_16MHZ |
             SYSCTL_OSC_MAIN);
     SysCtlPeripheralClockGating(true);
-
+    CPUUsageInit(SysCtlClockGet(), configTICK_RATE_HZ/10, 3);
     // Initialize the UART and configure it for 115,200, 8-N-1 operation.
     //
     // se usa para mandar mensajes por el puerto serie
@@ -94,17 +144,6 @@ void system_init()
     MAP_GPIOPinConfigure(GPIO_PA1_U0TX);
     MAP_GPIOPinTypeUART(GPIO_PORTA_BASE, GPIO_PIN_0 | GPIO_PIN_1);
     UARTStdioConfig(0, 115200, SysCtlClockGet());
-
-
-    SysCtlPeripheralEnable(SYSCTL_PERIPH_ADC0); // Enable ADC0
-    while(!SysCtlPeripheralReady(SYSCTL_PERIPH_ADC0))  // Wait for ADC0 to be ready
-    {
-    }
-
-    ADCSequenceConfigure(ADC0_BASE, 0, ADC_TRIGGER_PROCESSOR, 0);
-    ADCSequenceStepConfigure(ADC0_BASE, 0, 0, ADC_CTL_IE | ADC_CTL_END | ADC_CTL_CH0); // Interrupt + Last seq + channel 0 selected
-    ADCSequenceEnable(ADC0_BASE, 0);
-    ADCIntEnable(ADC0_BASE, 0);
     //
     // Configure PWM
     //
@@ -156,7 +195,12 @@ void system_init()
     // Enable the PWM1 Bit6 (PF2) and Bit7(PF3) output signal.
     //
     PWMOutputState(PWM1_BASE, PWM_OUT_6_BIT | PWM_OUT_7_BIT, true);
+
 }
+
+
+
+
 //*****************************************************************************
 //
 // Initialize FreeRTOS and start the initial set of tasks.
@@ -172,8 +216,8 @@ int main(void)
     //
     // Create tasks
     //
-    init_tasks();
-
+    //init_tasks();
+    ADCConfig();
     //
     // Start the scheduler.  This should not return.
     //
@@ -195,4 +239,6 @@ void ISR_ProximitySensor(void)
 
     ADCSequenceDataGet(ADC0_BASE, 0, &data_buff);
     UARTprintf("Data Rec: %d", data_buff);
+
+    ADCIntClear(ADC0_BASE,0);
 }

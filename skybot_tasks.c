@@ -46,6 +46,8 @@ static portTASK_FUNCTION(MotorsTask, pvParameters)
         PWMPulseWidthSet(PWM1_BASE, PWM_OUT_LEFT_MOTOR,
                              (uint32_t)((float)PWMGenPeriodGet(PWM1_BASE, PWM_GEN_3) * left_duty_cycle));
     }
+
+    //vTaskDelete(NULL);
 }
 
 static portTASK_FUNCTION(BrainTask, pvParameters)
@@ -57,6 +59,9 @@ static portTASK_FUNCTION(BrainTask, pvParameters)
     xQueueSend(xMotorsQueue, &speed, portMAX_DELAY);
 
     SysCtlSleep();
+
+    vTaskDelete(NULL);
+
 }
 
 
