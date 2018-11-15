@@ -136,13 +136,13 @@ void system_init()
     // Initialize the UART and configure it for 115,200, 8-N-1 operation.
     //
     // se usa para mandar mensajes por el puerto serie
-    MAP_SysCtlPeripheralEnable(SYSCTL_PERIPH_UART0);
-    MAP_SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_UART0);
-    MAP_SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA);
-    MAP_SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_GPIOA);
-    MAP_GPIOPinConfigure(GPIO_PA0_U0RX);
-    MAP_GPIOPinConfigure(GPIO_PA1_U0TX);
-    MAP_GPIOPinTypeUART(GPIO_PORTA_BASE, GPIO_PIN_0 | GPIO_PIN_1);
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_UART0);
+    SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_UART0);
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA);
+    SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_GPIOA);
+    GPIOPinConfigure(GPIO_PA0_U0RX);
+    GPIOPinConfigure(GPIO_PA1_U0TX);
+    GPIOPinTypeUART(GPIO_PORTA_BASE, GPIO_PIN_0 | GPIO_PIN_1);
     UARTStdioConfig(0, 115200, SysCtlClockGet());
     //
     // Configure PWM
@@ -235,10 +235,14 @@ int main(void)
 
 void ISR_ProximitySensor(void)
 {
+    portBASE_TYPE higherPriorityTaskWoken = pdFALSE;
+
+
     uint32_t data_buff;
 
-    ADCSequenceDataGet(ADC0_BASE, 0, &data_buff);
-    UARTprintf("Data Rec: %d", data_buff);
+    ADCSequenceDataGet(ADC0_BASE, 1, &data_buff);
+    UARTprintf("Data Rec: %d\n\n", data_buff);
+    ADCIntClear(ADC0_BASE,1);
+    portEND_SWITCHING_ISR(higherPriorityTaskWoken);
 
-    ADCIntClear(ADC0_BASE,0);
 }
