@@ -29,6 +29,9 @@
 /* An array to hold a count of the number of times each timer expires. */
 uint32_t ui32ExpireCounters =  0 ;
 int32_t i32Estado_led=0;
+
+uint8_t poll = 0xF0;       // TODO: Change to an union with multiple flags
+
 //*****************************************************************************
 //
 // The error routine that is called if the driver library encounters an error.
@@ -121,6 +124,49 @@ void ADCConfig(void)
        TimerEnable(TIMER5_BASE, TIMER_A);
 }
 
+
+void WhiskerConf(void)
+{
+    /***** Setup for TIMER4_A *****/
+
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER4);
+    while(!SysCtlPeripheralReady(SYSCTL_PERIPH_TIMER4))    // Wait for TIMER4 to be ready
+    {
+    }
+
+    SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_TIMER4);
+
+    TimerClockSourceSet(TIMER4_BASE,TIMER_CLOCK_SYSTEM);
+    TimerConfigure(TIMER4_BASE, TIMER_CFG_PERIODIC);
+    TimerLoadSet(TIMER4_BASE, TIMER_A, (SysCtlClockGet()/10)/4 - 1);       // 25ms
+
+    TimerDisable(TIMER4_BASE,TIMER_A);
+    TimerIntEnable(TIMER4_BASE, TIMER_TIMA_TIMEOUT);
+    IntPrioritySet(INT_TIMER4A, configMAX_SYSCALL_INTERRUPT_PRIORITY);
+    IntEnable(INT_TIMER4A);
+
+    /***** End TIMER4_A *****/
+
+    /***** Setup for Whisker Input (PORTF and PIN 0, same as sw2 on tiva board) *****/
+
+    ButtonsInit();
+
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
+    while(!SysCtlPeripheralReady(SYSCTL_PERIPH_GPIOF))    // Wait for GPIO_PF to be ready
+    {
+    }
+
+    SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_GPIOF);
+
+    GPIOPinTypeGPIOInput(GPIO_PORTF_BASE, GPIO_PIN_0);
+    GPIOIntTypeSet(GPIO_PORTF_BASE, GPIO_INT_PIN_0, GPIO_FALLING_EDGE) ;
+    GPIOIntClear(GPIO_PORTF_BASE, GPIO_INT_PIN_0);
+    GPIOIntEnable(GPIO_PORTF_BASE, GPIO_INT_PIN_0);
+    IntPrioritySet(INT_GPIOF, configMAX_SYSCALL_INTERRUPT_PRIORITY);
+    IntEnable(INT_GPIOF);
+
+    /***** End Whisker *****/
+}
 
 
 void system_init()
@@ -217,6 +263,7 @@ int main(void)
     // Create tasks
     //
     //init_tasks();
+    WhiskerConf();
     ADCConfig();
     //
     // Start the scheduler.  This should not return.
@@ -233,16 +280,43 @@ int main(void)
     }
 }
 
-void ISR_ProximitySensor(void)
+void ISR_ProximitySensor(void)                          // Remove after
 {
     portBASE_TYPE higherPriorityTaskWoken = pdFALSE;
-
-
     uint32_t data_buff;
 
     ADCSequenceDataGet(ADC0_BASE, 1, &data_buff);
-    UARTprintf("Data Rec: %d\n\n", data_buff);
     ADCIntClear(ADC0_BASE,1);
+    portEND_SWITCHING_ISR(higherPriorityTaskWoken);
+
+}
+
+void ISR_WhiskerSensor(void)
+{
+    portBASE_TYPE higherPriorityTaskWoken = pdFALSE;
+
+    poll = GPIOPinRead(GPIO_PORTF_BASE, GPIO_INT_PIN_0);
+    TimerEnable(TIMER4_BASE,TIMER_A);                           // Enable Timer4_A which will interrupt after 25ms
+
+    GPIOIntClear(GPIO_PORTF_BASE, GPIO_INT_PIN_0);
+    portEND_SWITCHING_ISR(higherPriorityTaskWoken);
+}
+
+void ISR_DebounceTimer(void)            // It Reads from Whisker button after 25ms in order to avoid multiple reads.
+{
+    portBASE_TYPE higherPriorityTaskWoken = pdFALSE;
+    static uint8_t pul = 0;
+
+    if(GPIOPinRead(GPIO_PORTF_BASE, GPIO_INT_PIN_0) == poll)
+    {
+        UARTprintf("Push n1: %d\n", pul);                       // Only for test, remove after
+        ++pul;
+    }
+
+    TimerDisable(TIMER4_BASE,TIMER_A);
+    TimerIntClear(TIMER4_BASE, TIMER_A);
+    TimerLoadSet(TIMER4_BASE, TIMER_A, (SysCtlClockGet()/10)/4 - 1);   // Reset the load into Timer4_A
+
     portEND_SWITCHING_ISR(higherPriorityTaskWoken);
 
 }
