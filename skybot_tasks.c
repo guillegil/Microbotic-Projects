@@ -123,7 +123,7 @@ static portTASK_FUNCTION(BrainTask, pvParameters)
             // Go foreward ???
         }
 
-
+       xQueueReset(whisker_queue);
        SysCtlSleep();
     }
 }

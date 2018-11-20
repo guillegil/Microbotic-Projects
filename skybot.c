@@ -141,9 +141,9 @@ void WhiskerConf(void)
 
     TimerClockSourceSet(TIMER4_BASE,TIMER_CLOCK_SYSTEM);
     TimerConfigure(TIMER4_BASE, TIMER_CFG_PERIODIC);
-    TimerLoadSet(TIMER4_BASE, TIMER_A, (SysCtlClockGet()/10)/2 - 1);       // 25ms
+    TimerLoadSet(TIMER4_BASE, TIMER_A, (SysCtlClockGet()/10)/4 - 1);       // 25ms
 
-    TimerDisable(TIMER4_BASE,TIMER_A);
+    TimerDisable(TIMER4_BASE, TIMER_A);
     TimerIntEnable(TIMER4_BASE, TIMER_TIMA_TIMEOUT);
     IntPrioritySet(INT_TIMER4A, configMAX_SYSCALL_INTERRUPT_PRIORITY);
     IntEnable(INT_TIMER4A);
@@ -298,8 +298,8 @@ void ISR_ProximitySensor(void)                          // Remove after
 void ISR_WhiskerSensor(void)
 {
     portBASE_TYPE higherPriorityTaskWoken = pdFALSE;
-    IntDisable(INT_GPIOF);
-;
+
+    poll = GPIOPinRead(GPIO_PORTF_BASE, GPIO_PIN_0);
     TimerEnable(TIMER4_BASE,TIMER_A);                           // Enable Timer4_A which will interrupt after 25ms
 
     GPIOIntClear(GPIO_PORTF_BASE, GPIO_INT_PIN_0);
@@ -311,7 +311,6 @@ void ISR_DebounceTimer(void)            // It Reads from Whisker button after 25
     portBASE_TYPE higherPriorityTaskWoken = pdFALSE;
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     uint8_t queue_data;
-
 
     if(!GPIOPinRead(GPIO_PORTF_BASE, GPIO_INT_PIN_0))                       // Send to BrainTask to stop (or change the direction) the ubot
     {
@@ -325,7 +324,7 @@ void ISR_DebounceTimer(void)            // It Reads from Whisker button after 25
         GPIOIntTypeSet(GPIO_PORTF_BASE, GPIO_INT_PIN_0, GPIO_FALLING_EDGE);
     }
 
-    IntEnable(INT_GPIOF);
+
 
     TimerDisable(TIMER4_BASE,TIMER_A);
     TimerIntClear(TIMER4_BASE, TIMER_A);
