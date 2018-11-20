@@ -16,6 +16,7 @@
 #include "drivers/buttons.h"     // TIVA: Funciones API manejo de botones
 #include "FreeRTOS.h"            // FreeRTOS: definiciones generales
 #include "task.h"                // FreeRTOS: definiciones relacionadas con tareas
+#include "queue.h"
 #include "driverlib/adc.h"
 #include "driverlib/timer.h"
 #include "utils/cpu_usage.h"
@@ -25,6 +26,8 @@
 
 
 // Variables globales
+
+extern xQueueHandle whisker_queue;
 
 /* An array to hold a count of the number of times each timer expires. */
 uint32_t ui32ExpireCounters =  0 ;
@@ -237,6 +240,7 @@ void system_init()
     PWMPulseWidthSet(PWM1_BASE, PWM_OUT_7,
                          (uint32_t)((float)PWMGenPeriodGet(PWM1_BASE, PWM_GEN_3) * (double)NEUTRAL_MOTORS_DUTYCYCLE));
 
+
     //
     // Enable the PWM1 Bit6 (PF2) and Bit7(PF3) output signal.
     //
@@ -262,7 +266,7 @@ int main(void)
     //
     // Create tasks
     //
-    //init_tasks();
+    init_tasks();
     WhiskerConf();
     ADCConfig();
     //
@@ -294,8 +298,8 @@ void ISR_ProximitySensor(void)                          // Remove after
 void ISR_WhiskerSensor(void)
 {
     portBASE_TYPE higherPriorityTaskWoken = pdFALSE;
+    IntDisable(INT_GPIOF);
 
-    poll = GPIOPinRead(GPIO_PORTF_BASE, GPIO_INT_PIN_0);
     TimerEnable(TIMER4_BASE,TIMER_A);                           // Enable Timer4_A which will interrupt after 25ms
 
     GPIOIntClear(GPIO_PORTF_BASE, GPIO_INT_PIN_0);
@@ -305,18 +309,25 @@ void ISR_WhiskerSensor(void)
 void ISR_DebounceTimer(void)            // It Reads from Whisker button after 25ms in order to avoid multiple reads.
 {
     portBASE_TYPE higherPriorityTaskWoken = pdFALSE;
-    static uint8_t pul = 0;
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
-    if(GPIOPinRead(GPIO_PORTF_BASE, GPIO_INT_PIN_0) == poll)
+    if(!GPIOPinRead(GPIO_PORTF_BASE, GPIO_INT_PIN_0))                       // Send to BrainTask to stop (or change the direction) the ubot
     {
-        UARTprintf("Push n1: %d\n", pul);                       // Only for test, remove after
-        ++pul;
+        poll = 1;
+        xQueueSendFromISR(whisker_queue, &poll, &xHigherPriorityTaskWoken);
+        GPIOIntTypeSet(GPIO_PORTF_BASE, GPIO_INT_PIN_0, GPIO_RISING_EDGE) ;
+    }else
+    {
+        poll = 0;
+        xQueueSendFromISR(whisker_queue, &poll, &xHigherPriorityTaskWoken);
+        GPIOIntTypeSet(GPIO_PORTF_BASE, GPIO_INT_PIN_0, GPIO_LOW_LEVEL);
     }
+
+    IntEnable(INT_GPIOF);
 
     TimerDisable(TIMER4_BASE,TIMER_A);
     TimerIntClear(TIMER4_BASE, TIMER_A);
     TimerLoadSet(TIMER4_BASE, TIMER_A, (SysCtlClockGet()/10)/4 - 1);   // Reset the load into Timer4_A
 
     portEND_SWITCHING_ISR(higherPriorityTaskWoken);
-
 }
