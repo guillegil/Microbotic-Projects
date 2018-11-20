@@ -29,6 +29,39 @@ xQueueHandle xMotorsQueue;
 xQueueHandle SensorsQueue;
 xQueueHandle whisker_queue;
 
+float proximty_sensor_lut[]=
+{
+     3212.5, 3186.2, 2325.5, 1812.1, 1466.3,
+     1225.4, 1030.2, 892,.2, 790.6, 686.1,
+     646.5, 560.4, 521.7, 489.6, 443.4,
+     419.7, 387.5, 377.7, 344.3, 318,
+     315.7, 304.8, 291.5
+};
+
+//static float getDistante()
+//{
+//    uint32_t data_buff;
+//    ADCSequenceDataGet(ADC0_BASE, 1, &data_buff);
+//
+//    uint8_t pos = 11;
+//
+//    if(data_buff > proximty_sensor_lut[pos])
+//        pos = pos/2;
+//    else
+//        pos = pos + pos/2;
+//
+//    if(data_buff > proximty_sensor_lut[pos])
+//        pos = pos/2;
+//    else
+//        pos = pos + pos/4;
+//
+//    if(data_buff > proximty_sensor_lut[pos])
+//        pos = pos/2;
+//    else
+//        pos = pos + pos/8;
+//}
+
+
 struct Speed
 {
     float right;
@@ -76,7 +109,7 @@ static portTASK_FUNCTION(BrainTask, pvParameters)
 
     while(1)
     {
-        xQueueReceive(whisker_queue, &whisker_active, 0);
+        xQueueReceive(whisker_queue, &whisker_active, portMAX_DELAY);
 
         if(whisker_active)
         {
