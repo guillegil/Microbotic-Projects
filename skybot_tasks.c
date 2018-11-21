@@ -26,6 +26,59 @@ xQueueHandle xMotorsQueue;
 xQueueHandle SensorsQueue;
 xQueueHandle whisker_queue;
 
+struct Speed
+{
+    float right;
+    float left;
+};
+
+void DodgeLeft()
+{
+    struct Speed speed;
+    vTaskDelay(100); // .5s delay
+
+    /****** Go Backward ******/
+    speed.left = -0.5f;
+    speed.right = -0.5f;
+
+    xQueueSend(xMotorsQueue, &speed, portMAX_DELAY);
+    vTaskDelay(1000); // 1s delay
+
+    /****** Turn left ******/
+
+    speed.left = 0.5f;
+    speed.right = -0.5f;
+
+    xQueueSend(xMotorsQueue, &speed, portMAX_DELAY);
+    vTaskDelay(500);
+
+    /****** Go Foreward ******/
+
+    speed.left = 0.5f;
+    speed.right = 0.5f;
+
+    xQueueSend(xMotorsQueue, &speed, portMAX_DELAY);
+    vTaskDelay(1500);
+
+    /****** Turn right ******/
+
+    speed.left = -0.5f;
+    speed.right = 0.5f;
+
+    xQueueSend(xMotorsQueue, &speed, portMAX_DELAY);
+    vTaskDelay(300);
+
+    /****** Go Foreward ******/
+
+    speed.left = 1.0f;
+    speed.right = 1.0f;
+
+    xQueueSend(xMotorsQueue, &speed, portMAX_DELAY);
+    vTaskDelay(1000);
+
+
+}
+
 float proximty_sensor_lut[]=
 {
      3212.5, 3186.2, 2325.5, 1812.1, 1466.3,
@@ -59,11 +112,7 @@ float proximty_sensor_lut[]=
 //}
 
 
-struct Speed
-{
-    float right;
-    float left;
-};
+
 
 
 
@@ -108,15 +157,14 @@ static portTASK_FUNCTION(MotorsTask, pvParameters)
 static portTASK_FUNCTION(BrainTask, pvParameters)
 {
     struct Speed speed;
-    speed.right = 0.0;
-    speed.left = 0.0;
 
     uint8_t whisker_active  = 0;
-    UARTprintf("Brain Task Start!\n\n");
+    UARTprintf("Brain Task Start!\n\n");     // Only for debug
 
-    //memset(&speed, 0, sizeof(struct Speed));
+    speed.left = 0.1;                        // Only for debug
+    speed.right = 0.1;
 
-    //xQueueSend(xMotorsQueue, &speed, portMAX_DELAY);
+    xQueueSend(xMotorsQueue, &speed, portMAX_DELAY);
 
     while(1)
     {
@@ -127,34 +175,23 @@ static portTASK_FUNCTION(BrainTask, pvParameters)
           memset(&speed, 0, sizeof(speed));
           xQueueSend(xMotorsQueue, &speed, portMAX_DELAY);
 
-          UARTprintf("Stoped\n");
+          UARTprintf("Stoped\n");    // Only for debug
+          DodgeLeft();               // Turn left.
         }else
         {
+            //memset(&speed, 0, sizeof(speed));                   // Only for debug
 
-
+            speed.left = 0.1;                        // Only for debug
+            speed.right = 0.1;
             xQueueSend(xMotorsQueue, &speed, portMAX_DELAY);
-            UARTprintf("Let's go ahead!\n");
 
+
+            UARTprintf("Let's go ahead!\n");                    // Only for debug
         }
 
-       xQueueReset(whisker_queue);
        SysCtlSleep();
     }
 }
-
-
-//static portTASK_FUNCTION(SensorTask, pvParameters)
-//{
-//    struct Speed speed;
-//
-//    speed.right = 0.0;
-//    speed.left = 0.0;
-//    xQueueSend(xMotorsQueue, &speed, portMAX_DELAY);
-//
-//    SysCtlSleep();
-//}
-
-
 
 void init_tasks()
 {
@@ -162,16 +199,10 @@ void init_tasks()
     whisker_queue = xQueueCreate(1, sizeof(uint8_t));
 
 
-
     if((xTaskCreate(BrainTask, "BrainTask", 256, NULL, tskIDLE_PRIORITY + 1, NULL)) != pdTRUE)
     {
         while(1);
     }
-
-//    if((xTaskCreate(SensorTask, "Sensor task", 256, NULL, tskIDLE_PRIORITY + 1, NULL)) != pdTRUE)
-//    {
-//        while(1);
-//    }
 
     if((xTaskCreate(MotorsTask, "MotorsTask", 256, NULL, tskIDLE_PRIORITY + 1, NULL)) != pdTRUE)
     {
@@ -179,15 +210,4 @@ void init_tasks()
     }
 }
 
-void DodgeLeft(struct Speed backward_speed, struct Speed foreward_speed)
-{
 
-
-    // Go Backward
-    xQueueSend(xMotorsQueue, &backward_speed, portMAX_DELAY);
-    vTaskDelay(1); // 1ms delay
-
-
-    // Turn Left (right wheel back and left wheel foreward)
-    // Go Foreward  with speed
-}
