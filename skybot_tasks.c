@@ -16,13 +16,10 @@
 #include "config.h"
 
 #define RIGHT_SPEED_GET(x) MAX_MOTORS_DUTYCYCLE - (MAX_FORWARD_SPEED - x.right) / (MAX_FORWARD_SPEED - MAX_BACKWARD_SPEED) * (MAX_MOTORS_DUTYCYCLE - MIN_MOTORS_DUTYCYCLE)
-
-#define LEFT_SPEED_GET(x) MAX_MOTORS_DUTYCYCLE - (MAX_FORWARD_SPEED - x.left) / (MAX_FORWARD_SPEED - MAX_BACKWARD_SPEED) * (MAX_MOTORS_DUTYCYCLE - MIN_MOTORS_DUTYCYCLE)
+#define LEFT_SPEED_GET(x) MAX_MOTORS_DUTYCYCLE - (MAX_FORWARD_SPEED + x.left) / (MAX_FORWARD_SPEED - MAX_BACKWARD_SPEED) * (MAX_MOTORS_DUTYCYCLE - MIN_MOTORS_DUTYCYCLE)
 
 #define RIGHT_DUTY_SET(x) PWMPulseWidthSet(PWM1_BASE, PWM_OUT_RIGHT_MOTOR, (uint32_t)((float)PWMGenPeriodGet(PWM1_BASE, PWM_GEN_3) * (RIGHT_SPEED_GET(x))))
-
 #define LEFT_DUTY_SET(x) PWMPulseWidthSet(PWM1_BASE, PWM_OUT_LEFT_MOTOR, (uint32_t)((float)PWMGenPeriodGet(PWM1_BASE, PWM_GEN_3) * (LEFT_SPEED_GET(x))))
-
 
 
 xQueueHandle xMotorsQueue;
@@ -81,11 +78,21 @@ static portTASK_FUNCTION(MotorsTask, pvParameters)
     while(1)
     {
         xQueueReceive(xMotorsQueue, &speed, portMAX_DELAY);
-        // TODO: truncar velocidades superiores a la máxima
+
+        if(speed.left > MAX_FORWARD_SPEED)
+            speed.left = MAX_FORWARD_SPEED;
+
+        if(speed.left < MAX_BACKWARD_SPEED)
+            speed.left = MAX_BACKWARD_SPEED;
+
+        if(speed.right > MAX_FORWARD_SPEED)
+            speed.left = MAX_FORWARD_SPEED;
+
+        if(speed.right < MAX_BACKWARD_SPEED)
+            speed.left = MAX_BACKWARD_SPEED;
 
         RIGHT_DUTY_SET(speed);
         LEFT_DUTY_SET(speed);
-        GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, GPIO_PIN_3);
 
         //right_duty_cycle = MAX_MOTORS_DUTYCYCLE - (MAX_FORWARD_SPEED - speed.right) / (MAX_FORWARD_SPEED - MAX_BACKWARD_SPEED) * (MAX_MOTORS_DUTYCYCLE - MIN_MOTORS_DUTYCYCLE);
         //left_duty_cycle = MAX_MOTORS_DUTYCYCLE - (MAX_FORWARD_SPEED - speed.left) / (MAX_FORWARD_SPEED - MAX_BACKWARD_SPEED) * (MAX_MOTORS_DUTYCYCLE - MIN_MOTORS_DUTYCYCLE);
@@ -107,6 +114,10 @@ static portTASK_FUNCTION(BrainTask, pvParameters)
     uint8_t whisker_active  = 0;
     UARTprintf("Brain Task Start!\n\n");
 
+    //memset(&speed, 0, sizeof(struct Speed));
+
+    //xQueueSend(xMotorsQueue, &speed, portMAX_DELAY);
+
     while(1)
     {
         xQueueReceive(whisker_queue, &whisker_active, portMAX_DELAY);
@@ -119,8 +130,11 @@ static portTASK_FUNCTION(BrainTask, pvParameters)
           UARTprintf("Stoped\n");
         }else
         {
+
+
+            xQueueSend(xMotorsQueue, &speed, portMAX_DELAY);
             UARTprintf("Let's go ahead!\n");
-            // Go foreward ???
+
         }
 
        xQueueReset(whisker_queue);
@@ -163,6 +177,17 @@ void init_tasks()
     {
         while(1);
     }
+}
+
+void DodgeLeft(struct Speed backward_speed, struct Speed foreward_speed)
+{
 
 
+    // Go Backward
+    xQueueSend(xMotorsQueue, &backward_speed, portMAX_DELAY);
+    vTaskDelay(1); // 1ms delay
+
+
+    // Turn Left (right wheel back and left wheel foreward)
+    // Go Foreward  with speed
 }
