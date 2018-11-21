@@ -202,7 +202,7 @@ tCmdLineEntry g_psCmdTable[] =
 {
     { "help",     Cmd_help,      "     : List all commands" },
     { "?",        Cmd_help,      "        : Same as help" },
-    { "motor",    Cmd_motor,     "       : Set right (r) or left (l) motor velocity"},
+    { "motor",    Cmd_motor,     "    : Set right (r) or left (l) motor velocity"},
     { "cpu",      Cmd_cpu,       "      : Show CPU usage" },
     { "free",     Cmd_free,      "     : Show free memory" },
 #if ( configUSE_TRACE_FACILITY == 1 )
