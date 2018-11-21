@@ -1,5 +1,5 @@
 
-#include <skybot_tasks.h>
+#include "skybot_tasks.h"
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -22,15 +22,12 @@
 #define LEFT_DUTY_SET(x) PWMPulseWidthSet(PWM1_BASE, PWM_OUT_LEFT_MOTOR, (uint32_t)((float)PWMGenPeriodGet(PWM1_BASE, PWM_GEN_3) * (LEFT_SPEED_GET(x))))
 
 
-xQueueHandle xMotorsQueue;
+
+extern void vUARTTask( void *pvParameters );
+
 xQueueHandle SensorsQueue;
 xQueueHandle whisker_queue;
 
-struct Speed
-{
-    float right;
-    float left;
-};
 
 void DodgeLeft()
 {
@@ -198,6 +195,11 @@ void init_tasks()
     xMotorsQueue = xQueueCreate(2, sizeof(struct Speed));
     whisker_queue = xQueueCreate(1, sizeof(uint8_t));
 
+
+    if((xTaskCreate(vUARTTask, (portCHAR *)"Uart", 512,NULL,tskIDLE_PRIORITY + 1, NULL) != pdTRUE))
+    {
+        while(1);
+    }
 
     if((xTaskCreate(BrainTask, "BrainTask", 256, NULL, tskIDLE_PRIORITY + 1, NULL)) != pdTRUE)
     {
