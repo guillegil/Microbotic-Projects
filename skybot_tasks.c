@@ -132,10 +132,10 @@ static portTASK_FUNCTION(MotorsTask, pvParameters)
             speed.left = MAX_BACKWARD_SPEED;
 
         if(speed.right > MAX_FORWARD_SPEED)
-            speed.left = MAX_FORWARD_SPEED;
+            speed.right = MAX_FORWARD_SPEED;
 
         if(speed.right < MAX_BACKWARD_SPEED)
-            speed.left = MAX_BACKWARD_SPEED;
+            speed.right = MAX_BACKWARD_SPEED;
 
         RIGHT_DUTY_SET(speed);
         LEFT_DUTY_SET(speed);
