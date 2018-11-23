@@ -129,6 +129,22 @@ void ADCConfig(void)
        TimerEnable(TIMER5_BASE, TIMER_A);
 }
 
+void EncoderConf(void)
+{
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOB);
+    while(!SysCtlPeripheralReady(SYSCTL_PERIPH_GPIOB))    // Wait for GPIO_PF to be ready
+
+    SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_GPIOB);
+
+    GPIOPinTypeGPIOInput(GPIO_PORTB_BASE, GPIO_PIN_1);
+    GPIOIntTypeSet(GPIO_PORTB_BASE, GPIO_INT_PIN_1, GPIO_BOTH_EDGES) ;
+    GPIOIntClear(GPIO_PORTB_BASE, GPIO_INT_PIN_1);
+    GPIOIntEnable(GPIO_PORTB_BASE, GPIO_INT_PIN_1);
+    IntPrioritySet(INT_GPIOB, configMAX_SYSCALL_INTERRUPT_PRIORITY);
+    IntEnable(INT_GPIOB);
+
+}
+
 
 void WhiskerConf(void)
 {
@@ -154,12 +170,8 @@ void WhiskerConf(void)
 
     /***** Setup for Whisker Input (PORTF and PIN 0, same as sw2 on tiva board) *****/
 
-    ButtonsInit();
-
     SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
     while(!SysCtlPeripheralReady(SYSCTL_PERIPH_GPIOF))    // Wait for GPIO_PF to be ready
-    {
-    }
 
     SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_GPIOF);
 
@@ -265,12 +277,18 @@ int main(void)
     //
     system_init();
 
+    ButtonsInit();
+
     //
     // Create tasks
     //
-    init_tasks();
     WhiskerConf();
+    EncoderConf();
     ADCConfig();
+
+
+
+    init_tasks();
     //
     // Start the scheduler.  This should not return.
     //
@@ -302,9 +320,22 @@ void ISR_WhiskerSensor(void)
     portBASE_TYPE higherPriorityTaskWoken = pdFALSE;
 
     poll = GPIOPinRead(GPIO_PORTF_BASE, GPIO_PIN_0);
-    TimerEnable(TIMER4_BASE,TIMER_A);                           // Enable Timer4_A which will interrupt after 25ms
+    TimerEnable(TIMER4_BASE,TIMER_A);                                   // Enable Timer4_A which will interrupt after 25ms
 
     GPIOIntClear(GPIO_PORTF_BASE, GPIO_INT_PIN_0);
+    portEND_SWITCHING_ISR(higherPriorityTaskWoken);
+}
+
+void ISR_EncoderSensor(void)
+{
+    portBASE_TYPE higherPriorityTaskWoken = pdFALSE;
+    uint8_t enco;
+
+    enco = GPIOPinRead(GPIO_PORTB_BASE, GPIO_PIN_1);
+    if(enco == 0x02)
+           UARTprintf("Encoder value: %d\n", enco);             // Only for debug
+
+    GPIOIntClear(GPIO_PORTB_BASE, GPIO_INT_PIN_1);
     portEND_SWITCHING_ISR(higherPriorityTaskWoken);
 }
 
