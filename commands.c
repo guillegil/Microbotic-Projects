@@ -179,7 +179,7 @@ int Cmd_motor(int argc, char *argv[])
 
     if (argc != 3)
     {
-        UARTprintf("use: motor <right_velocity> <left_velocity>\n");
+        UARTprintf("use: motor <right_speed> <left_speed>\n");
     }
     else
     {
@@ -194,6 +194,23 @@ int Cmd_motor(int argc, char *argv[])
 }
 
 
+int Cmd_prox(int argc, char *argv[])
+{
+    UARTFlushRx();
+
+    while(UARTRxBytesAvail() == 0)
+    {
+        float data = get_distance();
+        UARTprintf("%d\n", get_distance()); //UARTprintf("%f\n",get_distance());
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+    }
+
+    UARTFlushRx();
+
+    return(0);
+}
+
+
 
 // ==============================================================================
 // Tabla con los comandos y su descripcion. Si quiero anadir alguno, debo hacerlo aqui
@@ -202,7 +219,8 @@ tCmdLineEntry g_psCmdTable[] =
 {
     { "help",     Cmd_help,      "     : List all commands" },
     { "?",        Cmd_help,      "        : Same as help" },
-    { "motor",    Cmd_motor,     "    : Set right (r) or left (l) motor velocity"},
+    { "motor",    Cmd_motor,     "    : Set right and left motor speed"},
+    { "prox",     Cmd_prox,      "     : Show distance detected by proximity sensor"},
     { "cpu",      Cmd_cpu,       "      : Show CPU usage" },
     { "free",     Cmd_free,      "     : Show free memory" },
 #if ( configUSE_TRACE_FACILITY == 1 )

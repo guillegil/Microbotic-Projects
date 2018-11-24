@@ -8,7 +8,7 @@
 //#include "driverlib/uart.h"
 #include "utils/uartstdio.h"
 #include "driverlib/gpio.h"      // TIVA: Funciones API de GPIO
-
+#include "driverlib/adc.h"
 
 #include "FreeRTOS.h"
 #include "task.h"
@@ -21,6 +21,7 @@
 #define RIGHT_DUTY_SET(x) PWMPulseWidthSet(PWM1_BASE, PWM_OUT_RIGHT_MOTOR, (uint32_t)((float)PWMGenPeriodGet(PWM1_BASE, PWM_GEN_3) * (RIGHT_SPEED_GET(x))))
 #define LEFT_DUTY_SET(x) PWMPulseWidthSet(PWM1_BASE, PWM_OUT_LEFT_MOTOR, (uint32_t)((float)PWMGenPeriodGet(PWM1_BASE, PWM_GEN_3) * (LEFT_SPEED_GET(x))))
 
+#define LUT_SIZE    23
 
 
 extern void vUARTTask( void *pvParameters );
@@ -76,37 +77,48 @@ void DodgeLeft()
 
 }
 
-float proximty_sensor_lut[]=
+short proximity_lut[LUT_SIZE] =
 {
-     3212.5, 3186.2, 2325.5, 1812.1, 1466.3,
-     1225.4, 1030.2, 892,.2, 790.6, 686.1,
-     646.5, 560.4, 521.7, 489.6, 443.4,
-     419.7, 387.5, 377.7, 344.3, 318,
-     315.7, 304.8, 291.5
+     3212, 3186, 2325, 1812, 1466,
+     1225, 1030, 892,  791,  686,
+     646,  560,  522,  490,  443,
+     420,  387,  378,  344,  318,
+     316,  305,  291
 };
 
-//static float getDistante()
-//{
-//    uint32_t data_buff;
-//    ADCSequenceDataGet(ADC0_BASE, 1, &data_buff);
-//
-//    uint8_t pos = 11;
-//
-//    if(data_buff > proximty_sensor_lut[pos])
-//        pos = pos/2;
-//    else
-//        pos = pos + pos/2;
-//
-//    if(data_buff > proximty_sensor_lut[pos])
-//        pos = pos/2;
-//    else
-//        pos = pos + pos/4;
-//
-//    if(data_buff > proximty_sensor_lut[pos])
-//        pos = pos/2;
-//    else
-//        pos = pos + pos/8;
-//}
+
+short get_distance()
+{
+    short out, inc;
+    unsigned int imin, imid, imax;
+    uint32_t data;
+
+    ADCProcessorTrigger(ADC0_BASE, 1);          // Causes a processor trigger for a sample sequence
+    ADCSequenceDataGet(ADC0_BASE, 1, &data);
+
+    imin = 0;
+    imax = LUT_SIZE - 1;
+
+    if(proximity_lut[imin] < data)
+        return 20;
+    if(proximity_lut[imax] > data)
+        return LUT_SIZE * 20;
+
+    while (imin + 1 < imax)
+    {
+        imid = (imin+imax)>>1;
+
+        if (proximity_lut[imid] < data)
+            imax = imid;
+        else
+            imin = imid;
+    }
+
+    inc = 20 * (proximity_lut[imin] - data) / (proximity_lut[imin] - proximity_lut[imax]);
+    out = 20 * (1 + imin) + inc;
+
+    return out;
+}
 
 
 

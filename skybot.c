@@ -84,7 +84,8 @@ void vApplicationIdleHook(xTaskHandle *pxTask, signed char *pcTaskName)
 //*****************************************************************************
 void ADCConfig(void)
 {
-      SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER5);
+    /*
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER5);
       while(!SysCtlPeripheralReady(SYSCTL_PERIPH_TIMER5))    // Wait for TIMER5 to be ready
       {
       }
@@ -94,7 +95,7 @@ void ADCConfig(void)
       TimerClockSourceSet(TIMER5_BASE,TIMER_CLOCK_SYSTEM);
       TimerConfigure(TIMER5_BASE, TIMER_CFG_PERIODIC);
       TimerLoadSet(TIMER5_BASE, TIMER_A, SysCtlClockGet() - 1);
-
+*/
 
        SysCtlPeripheralEnable(SYSCTL_PERIPH_ADC0);         // Enable ADC0
        while(!SysCtlPeripheralReady(SYSCTL_PERIPH_ADC0))    // Wait for ADC0 to be ready
@@ -114,19 +115,19 @@ void ADCConfig(void)
 
        ADCClockConfigSet(ADC0_BASE, ADC_CLOCK_RATE_FULL, 1);
 
-       ADCSequenceConfigure(ADC0_BASE, 1, ADC_TRIGGER_TIMER, 0);
-       TimerControlTrigger(TIMER5_BASE, TIMER_A, true);
+       ADCSequenceConfigure(ADC0_BASE, 1, ADC_TRIGGER_PROCESSOR, 0);
+       //TimerControlTrigger(TIMER5_BASE, TIMER_A, true);
 
        ADCSequenceStepConfigure(ADC0_BASE, 1, 0, ADC_CTL_IE | ADC_CTL_END | ADC_CTL_CH0); // Interrupt + Last seq + channel 0 selected
        ADCSequenceEnable(ADC0_BASE, 1);
-
+       /*
        ADCIntEnable(ADC0_BASE, 1);
        ADCIntClear(ADC0_BASE,1);
        IntPrioritySet(INT_ADC0SS1, configMAX_SYSCALL_INTERRUPT_PRIORITY);
        IntEnable(INT_ADC0SS1);
-       IntMasterEnable();
-
-       TimerEnable(TIMER5_BASE, TIMER_A);
+       //IntMasterEnable(); // FIXME: remove this line (careful)
+       */
+       //TimerEnable(TIMER5_BASE, TIMER_A);
 }
 
 void EncoderConf(void)

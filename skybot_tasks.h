@@ -12,6 +12,7 @@ struct Speed
 };
 
 void init_tasks();
+short get_distance();
 
 
 #endif /* SKYBOT_TASKS_H_ */
