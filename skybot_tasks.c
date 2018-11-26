@@ -170,8 +170,8 @@ static portTASK_FUNCTION(BrainTask, pvParameters)
     uint8_t whisker_active  = 0;
     UARTprintf("Brain Task Start!\n\n");     // Only for debug
 
-    speed.left = 0.1;                        // Only for debug
-    speed.right = 0.1;
+    speed.left = 1.0;                        // Only for debug
+    speed.right = 1.0;
 
     xQueueSend(xMotorsQueue, &speed, portMAX_DELAY);
 
@@ -186,16 +186,14 @@ static portTASK_FUNCTION(BrainTask, pvParameters)
 
           UARTprintf("Stoped\n");    // Only for debug
           DodgeLeft();               // Turn left.
-        }else
+        }
+        else
         {
             //memset(&speed, 0, sizeof(speed));                   // Only for debug
 
-            speed.left = 0.1;                        // Only for debug
-            speed.right = 0.1;
+            speed.left = 1.0;                        // Only for debug
+            speed.right = 1.0;
             xQueueSend(xMotorsQueue, &speed, portMAX_DELAY);
-
-
-            UARTprintf("Let's go ahead!\n");                    // Only for debug
         }
 
        SysCtlSleep();
@@ -206,6 +204,7 @@ void init_tasks()
 {
     xMotorsQueue = xQueueCreate(2, sizeof(struct Speed));
     whisker_queue = xQueueCreate(1, sizeof(uint8_t));
+    encoderQueue = xQueueCreate(2, sizeof(uint8_t));
 
 
     if((xTaskCreate(vUARTTask, (portCHAR *)"Uart", 512,NULL,tskIDLE_PRIORITY + 1, NULL) != pdTRUE))
