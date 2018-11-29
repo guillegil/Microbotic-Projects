@@ -302,8 +302,6 @@ int main(void)
     EncoderConf();
     ADCConfig();
 
-
-
     init_tasks();
     //
     // Start the scheduler.  This should not return.
@@ -345,43 +343,37 @@ void ISR_WhiskerSensor(void)
 void ISR_EncoderSensor(void)
 {
     portBASE_TYPE higherPriorityTaskWoken = pdFALSE;
-    uint8_t enco;
+    struct MovementCommand command;
+    command.id = REGISTER_MOVEMENT;
 
     if(GPIOIntStatus(GPIO_PORTB_BASE, GPIO_PIN_1) == GPIO_INT_PIN_1)
     {
-        enco = RIGHT_WHEEL;
+        command.parameter = RIGHT_WHEEL;
         GPIOIntClear(GPIO_PORTB_BASE, GPIO_INT_PIN_1);
     }
     else
     {
-        enco = LEFT_WHEEL;
+        command.parameter = LEFT_WHEEL;
         GPIOIntClear(GPIO_PORTB_BASE, GPIO_INT_PIN_2);
     }
-    xQueueSendFromISR(encoderQueue, &enco, &higherPriorityTaskWoken);
+    xQueueSendFromISR(movementQueue, &command, &higherPriorityTaskWoken);
     portEND_SWITCHING_ISR(higherPriorityTaskWoken);
 }
 
 void ISR_DebounceTimer(void)            // It Reads from Whisker button after 25ms in order to avoid multiple reads.
 {
     portBASE_TYPE higherPriorityTaskWoken = pdFALSE;
-    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    BaseType_t queue_state = errQUEUE_FULL;
-
-    uint8_t queue_data;
 
     if(!GPIOPinRead(GPIO_PORTF_BASE, GPIO_INT_PIN_0))                       // Send to BrainTask to stop (or change the direction) the ubot
     {
-        queue_data = 1;
+        sendEventFromISR(COLLISION_START, higherPriorityTaskWoken);
         GPIOIntTypeSet(GPIO_PORTF_BASE, GPIO_INT_PIN_0, GPIO_RISING_EDGE) ;
-    }else
+    }
+    else
     {
-        queue_data = 0;
+        sendEventFromISR(COLLISION_END, higherPriorityTaskWoken);
         GPIOIntTypeSet(GPIO_PORTF_BASE, GPIO_INT_PIN_0, GPIO_FALLING_EDGE);
     }
-
-    do
-        queue_state = xQueueSendFromISR(whisker_queue, &queue_data, &xHigherPriorityTaskWoken);
-    while(queue_state != errQUEUE_FULL);
 
     TimerDisable(TIMER4_BASE,TIMER_A);
     TimerIntClear(TIMER4_BASE, TIMER_A);
