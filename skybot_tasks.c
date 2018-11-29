@@ -206,14 +206,15 @@ static portTASK_FUNCTION(MotorsTask, pvParameters)
 static portTASK_FUNCTION(BrainTask, pvParameters)
 {
     struct Event event;
-    bool dodging, turning;
+    bool dodging, turning, long_side;
 
     dodging = false;
     turning = false;
+    long_side = true;
 
     setSpeed(0, 0);
 
-    move(200);
+    move(180);
 
     while(true)
     {
@@ -239,7 +240,8 @@ static portTASK_FUNCTION(BrainTask, pvParameters)
                     else
                     {
                         dodging = false;
-                        move(200);
+                        long_side = true;
+                        move(180);
                     }
                 }
                 else
@@ -247,7 +249,16 @@ static portTASK_FUNCTION(BrainTask, pvParameters)
                     if(turning)
                     {
                         turning = false;
-                        move(200);
+                        if(long_side)
+                        {
+                            long_side = false;
+                            move(120);
+                        }
+                        else
+                        {
+                            long_side = true;
+                            move(180);
+                        }
                     }
                     else
                     {
