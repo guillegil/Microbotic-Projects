@@ -24,4 +24,10 @@
 #define PWM_OUT_RIGHT_MOTOR         PWM_OUT_6       // Right wheel PWM output used in some PWM api functions
 #define PWM_OUT_LEFT_MOTOR          PWM_OUT_7       // Left wheel PWM output used in some PWM api functions
 
+#define ENCODER_STRIPES             (36)
+#define WHEEL_DIAMETER              (59.0f)         // Millimeters
+#define WHEELS_SEPARATION           (93)            // Millimeters FIXME: MEASURE!!!!
+
+#define M_PI                        (3.14159f)      // Pi
+
 #endif /* CONFIG_H_ */

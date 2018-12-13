@@ -132,18 +132,33 @@ void ADCConfig(void)
 
 void EncoderConf(void)
 {
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER3);
+    while(!SysCtlPeripheralReady(SYSCTL_PERIPH_TIMER3))    // Wait for TIMER3 to be ready
+    {
+    }
+
+    SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_TIMER3);
+
+    TimerClockSourceSet(TIMER3_BASE,TIMER_CLOCK_SYSTEM);
+    TimerConfigure(TIMER3_BASE, TIMER_CFG_PERIODIC);
+    TimerLoadSet(TIMER3_BASE, TIMER_A, SysCtlClockGet() - 1);
+
+    TimerDisable(TIMER3_BASE, TIMER_A);
+    TimerIntEnable(TIMER3_BASE, TIMER_TIMA_TIMEOUT);
+    IntPrioritySet(INT_TIMER3A, configMAX_SYSCALL_INTERRUPT_PRIORITY);
+    IntEnable(INT_TIMER4A);
+
     SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOB);
     while(!SysCtlPeripheralReady(SYSCTL_PERIPH_GPIOB))    // Wait for GPIO_PF to be ready
 
     SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_GPIOB);
 
-    GPIOPinTypeGPIOInput(GPIO_PORTB_BASE, GPIO_PIN_1);
-    GPIOIntTypeSet(GPIO_PORTB_BASE, GPIO_INT_PIN_1, GPIO_BOTH_EDGES) ;
-    GPIOIntClear(GPIO_PORTB_BASE, GPIO_INT_PIN_1);
-    GPIOIntEnable(GPIO_PORTB_BASE, GPIO_INT_PIN_1);
+    GPIOPinTypeGPIOInput(GPIO_PORTB_BASE, GPIO_PIN_1 | GPIO_PIN_2);
+    GPIOIntTypeSet(GPIO_PORTB_BASE, GPIO_INT_PIN_1 | GPIO_PIN_2, GPIO_BOTH_EDGES) ;
+    GPIOIntClear(GPIO_PORTB_BASE, GPIO_INT_PIN_1 | GPIO_PIN_2);
+    GPIOIntEnable(GPIO_PORTB_BASE, GPIO_INT_PIN_1 | GPIO_PIN_2);
     IntPrioritySet(INT_GPIOB, configMAX_SYSCALL_INTERRUPT_PRIORITY);
     IntEnable(INT_GPIOB);
-
 }
 
 
@@ -287,8 +302,6 @@ int main(void)
     EncoderConf();
     ADCConfig();
 
-
-
     init_tasks();
     //
     // Start the scheduler.  This should not return.
@@ -330,37 +343,37 @@ void ISR_WhiskerSensor(void)
 void ISR_EncoderSensor(void)
 {
     portBASE_TYPE higherPriorityTaskWoken = pdFALSE;
-    uint8_t enco;
+    struct MovementCommand command;
+    command.id = REGISTER_MOVEMENT;
 
-    enco = GPIOPinRead(GPIO_PORTB_BASE, GPIO_PIN_1);
-    if(enco == 0x02)
-           UARTprintf("Encoder value: %d\n", enco);             // Only for debug
-
-    GPIOIntClear(GPIO_PORTB_BASE, GPIO_INT_PIN_1);
+    if(GPIOIntStatus(GPIO_PORTB_BASE, GPIO_PIN_1) == GPIO_INT_PIN_1)
+    {
+        command.parameter = RIGHT_WHEEL;
+        GPIOIntClear(GPIO_PORTB_BASE, GPIO_INT_PIN_1);
+    }
+    else
+    {
+        command.parameter = LEFT_WHEEL;
+        GPIOIntClear(GPIO_PORTB_BASE, GPIO_INT_PIN_2);
+    }
+    xQueueSendFromISR(movementQueue, &command, &higherPriorityTaskWoken);
     portEND_SWITCHING_ISR(higherPriorityTaskWoken);
 }
 
 void ISR_DebounceTimer(void)            // It Reads from Whisker button after 25ms in order to avoid multiple reads.
 {
     portBASE_TYPE higherPriorityTaskWoken = pdFALSE;
-    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    BaseType_t queue_state = errQUEUE_FULL;
-
-    uint8_t queue_data;
 
     if(!GPIOPinRead(GPIO_PORTF_BASE, GPIO_INT_PIN_0))                       // Send to BrainTask to stop (or change the direction) the ubot
     {
-        queue_data = 1;
+        sendEventFromISR(COLLISION_START, higherPriorityTaskWoken);
         GPIOIntTypeSet(GPIO_PORTF_BASE, GPIO_INT_PIN_0, GPIO_RISING_EDGE) ;
-    }else
+    }
+    else
     {
-        queue_data = 0;
+        sendEventFromISR(COLLISION_END, higherPriorityTaskWoken);
         GPIOIntTypeSet(GPIO_PORTF_BASE, GPIO_INT_PIN_0, GPIO_FALLING_EDGE);
     }
-
-    do
-        queue_state = xQueueSendFromISR(whisker_queue, &queue_data, &xHigherPriorityTaskWoken);
-    while(queue_state != errQUEUE_FULL);
 
     TimerDisable(TIMER4_BASE,TIMER_A);
     TimerIntClear(TIMER4_BASE, TIMER_A);

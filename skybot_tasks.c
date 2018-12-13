@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdlib.h>
 #include "driverlib/sysctl.h"
 #include "driverlib/pwm.h"
 //#include "driverlib/uart.h"
@@ -27,7 +28,49 @@
 extern void vUARTTask( void *pvParameters );
 
 xQueueHandle SensorsQueue;
-xQueueHandle whisker_queue;
+
+
+inline void setSpeed(float right, float left)
+{
+    struct Speed speed = {right, left};
+    xQueueSend(motorsQueue, &speed, portMAX_DELAY);
+}
+
+inline void sendEvent(uint8_t id)
+{
+    struct Event event = {id};
+    xQueueSend(brainQueue, &event, portMAX_DELAY);
+}
+
+inline void sendEventFromISR(uint8_t id, portBASE_TYPE higherPriorityTaskWoken)
+{
+    struct Event event = {id};
+    xQueueSendFromISR(brainQueue, &event, &higherPriorityTaskWoken);
+}
+
+void move(int16_t distance)
+{
+    struct MovementCommand command;
+    command.id = MOVE;
+    command.parameter = distance;
+    xQueueSend(movementQueue, &command, portMAX_DELAY);
+}
+
+void turn(int16_t angle)
+{
+    struct MovementCommand command;
+    command.id = TURN;
+    command.parameter = angle;
+    xQueueSend(movementQueue, &command, portMAX_DELAY);
+}
+
+void registerMovemente(int16_t wheel)
+{
+    struct MovementCommand command;
+    command.id = REGISTER_MOVEMENT;
+    command.parameter = wheel;
+    xQueueSend(movementQueue, &command, portMAX_DELAY);
+}
 
 
 void DodgeLeft()
@@ -39,7 +82,7 @@ void DodgeLeft()
     speed.left = -0.5f;
     speed.right = -0.5f;
 
-    xQueueSend(xMotorsQueue, &speed, portMAX_DELAY);
+    xQueueSend(motorsQueue, &speed, portMAX_DELAY);
     vTaskDelay(1000); // 1s delay
 
     /****** Turn left ******/
@@ -47,7 +90,7 @@ void DodgeLeft()
     speed.left = 0.5f;
     speed.right = -0.5f;
 
-    xQueueSend(xMotorsQueue, &speed, portMAX_DELAY);
+    xQueueSend(motorsQueue, &speed, portMAX_DELAY);
     vTaskDelay(500);
 
     /****** Go Foreward ******/
@@ -55,7 +98,7 @@ void DodgeLeft()
     speed.left = 0.5f;
     speed.right = 0.5f;
 
-    xQueueSend(xMotorsQueue, &speed, portMAX_DELAY);
+    xQueueSend(motorsQueue, &speed, portMAX_DELAY);
     vTaskDelay(1500);
 
     /****** Turn right ******/
@@ -63,7 +106,7 @@ void DodgeLeft()
     speed.left = -0.5f;
     speed.right = 0.5f;
 
-    xQueueSend(xMotorsQueue, &speed, portMAX_DELAY);
+    xQueueSend(motorsQueue, &speed, portMAX_DELAY);
     vTaskDelay(300);
 
     /****** Go Foreward ******/
@@ -71,7 +114,7 @@ void DodgeLeft()
     speed.left = 1.0f;
     speed.right = 1.0f;
 
-    xQueueSend(xMotorsQueue, &speed, portMAX_DELAY);
+    xQueueSend(motorsQueue, &speed, portMAX_DELAY);
     vTaskDelay(1000);
 
 
@@ -122,9 +165,6 @@ short get_distance()
 
 
 
-
-
-
 static portTASK_FUNCTION(MotorsTask, pvParameters)
 {
     struct Speed speed;
@@ -135,7 +175,7 @@ static portTASK_FUNCTION(MotorsTask, pvParameters)
 
     while(1)
     {
-        xQueueReceive(xMotorsQueue, &speed, portMAX_DELAY);
+        xQueueReceive(motorsQueue, &speed, portMAX_DELAY);
 
         if(speed.left > MAX_FORWARD_SPEED)
             speed.left = MAX_FORWARD_SPEED;
@@ -165,50 +205,139 @@ static portTASK_FUNCTION(MotorsTask, pvParameters)
 
 static portTASK_FUNCTION(BrainTask, pvParameters)
 {
-    struct Speed speed;
+    struct Event event;
+    bool dodging, turning, long_side;
 
-    uint8_t whisker_active  = 0;
-    UARTprintf("Brain Task Start!\n\n");     // Only for debug
+    dodging = false;
+    turning = false;
+    long_side = true;
 
-    speed.left = 0.1;                        // Only for debug
-    speed.right = 0.1;
+    setSpeed(0, 0);
 
-    xQueueSend(xMotorsQueue, &speed, portMAX_DELAY);
+    move(180);
 
-    while(1)
+    while(true)
     {
-        xQueueReceive(whisker_queue, &whisker_active, portMAX_DELAY);
+        xQueueReceive(brainQueue, &event, portMAX_DELAY);
 
-        if(whisker_active)
+        switch(event.id)
         {
-          memset(&speed, 0, sizeof(speed));
-          xQueueSend(xMotorsQueue, &speed, portMAX_DELAY);
-
-          UARTprintf("Stoped\n");    // Only for debug
-          DodgeLeft();               // Turn left.
-        }else
-        {
-            //memset(&speed, 0, sizeof(speed));                   // Only for debug
-
-            speed.left = 0.1;                        // Only for debug
-            speed.right = 0.1;
-            xQueueSend(xMotorsQueue, &speed, portMAX_DELAY);
-
-
-            UARTprintf("Let's go ahead!\n");                    // Only for debug
+            case COLLISION_START:
+                dodging = true;
+                turning = false;
+                move(-50);
+                break;
+            case COLLISION_END:
+                break;
+            case UBOT_STOPPED:
+                if(dodging)
+                {
+                    if(!turning)
+                    {
+                        turn(-90);
+                        turning = true;
+                    }
+                    else
+                    {
+                        dodging = false;
+                        long_side = true;
+                        move(180);
+                    }
+                }
+                else
+                {
+                    if(turning)
+                    {
+                        turning = false;
+                        if(long_side)
+                        {
+                            long_side = false;
+                            move(120);
+                        }
+                        else
+                        {
+                            long_side = true;
+                            move(180);
+                        }
+                    }
+                    else
+                    {
+                        turning = true;
+                        turn(90);
+                    }
+                }
+                break;
         }
 
        SysCtlSleep();
     }
 }
 
+
+static portTASK_FUNCTION(MovementTask, pvParameters)
+{
+    uint32_t remain_right_increments, remain_left_increments;
+    struct MovementCommand command;
+
+    while(true)
+    {
+        xQueueReceive(movementQueue, &command, portMAX_DELAY);
+
+        switch(command.id)
+        {
+            case MOVE:
+                remain_right_increments = (abs(command.parameter) * ENCODER_STRIPES) / (unsigned)(WHEEL_DIAMETER * M_PI);
+                remain_left_increments = (abs(command.parameter) * ENCODER_STRIPES) / (unsigned)(WHEEL_DIAMETER * M_PI);
+                if(command.parameter > 0)
+                    setSpeed(MAX_FORWARD_SPEED, MAX_FORWARD_SPEED);
+                else
+                    setSpeed(MAX_BACKWARD_SPEED, MAX_BACKWARD_SPEED);
+                break;
+
+            case TURN:
+                remain_right_increments = (abs(command.parameter) * ENCODER_STRIPES * WHEELS_SEPARATION) / WHEEL_DIAMETER / 360;
+                remain_left_increments = (abs(command.parameter) * ENCODER_STRIPES * WHEELS_SEPARATION) / WHEEL_DIAMETER / 360;
+                if(command.parameter > 0)
+                    setSpeed(MAX_FORWARD_SPEED, MAX_BACKWARD_SPEED);
+                else
+                    setSpeed(MAX_BACKWARD_SPEED, MAX_FORWARD_SPEED);
+                break;
+
+            case REGISTER_MOVEMENT:
+                if(command.parameter == RIGHT_WHEEL)
+                    remain_right_increments--;
+                else if(command.parameter == LEFT_WHEEL)
+                    remain_left_increments--;
+                if(remain_right_increments == 0  || remain_left_increments == 0)
+                {
+                    setSpeed(0, 0);
+                    sendEvent(UBOT_STOPPED);
+                }
+                break;
+        }
+
+    }
+
+}
+
 void init_tasks()
 {
-    xMotorsQueue = xQueueCreate(2, sizeof(struct Speed));
-    whisker_queue = xQueueCreate(1, sizeof(uint8_t));
+    motorsQueue = xQueueCreate(2, sizeof(struct Speed));
+    brainQueue = xQueueCreate(1, sizeof(uint8_t));
+    movementQueue = xQueueCreate(3, sizeof(struct MovementCommand));
 
 
     if((xTaskCreate(vUARTTask, (portCHAR *)"Uart", 512,NULL,tskIDLE_PRIORITY + 1, NULL) != pdTRUE))
+    {
+        while(1);
+    }
+
+    if((xTaskCreate(MotorsTask, "MotorsTask", 256, NULL, tskIDLE_PRIORITY + 1, NULL)) != pdTRUE)
+    {
+        while(1);
+    }
+
+    if((xTaskCreate(MovementTask, "MovementTask", 256, NULL, tskIDLE_PRIORITY + 1, NULL)) != pdTRUE)
     {
         while(1);
     }
@@ -218,10 +347,6 @@ void init_tasks()
         while(1);
     }
 
-    if((xTaskCreate(MotorsTask, "MotorsTask", 256, NULL, tskIDLE_PRIORITY + 1, NULL)) != pdTRUE)
-    {
-        while(1);
-    }
 }
 
 
