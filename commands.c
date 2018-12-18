@@ -40,6 +40,10 @@
 // Personal includes
 #include "skybot_tasks.h"
 
+extern TaskHandle_t xMotorsTask;
+extern TaskHandle_t xMovementTask;
+extern TaskHandle_t xBrainTask;
+
 // ==============================================================================
 // The CPU usage in percent, in 16.16 fixed point format.
 // ==============================================================================
@@ -210,6 +214,32 @@ int Cmd_prox(int argc, char *argv[])
     return(0);
 }
 
+int Cmd_stop(int argc, char *argv[])
+{
+    UARTFlushRx();
+
+   // vTaskSuspend(xMotorsTask);
+   // vTaskSuspend(xMovementTask);
+   vTaskSuspend(xBrainTask);
+   setSpeed(0.0f, 0.0f);
+
+
+   return(0);
+}
+
+int Cmd_resume(int argc, char *argv[])
+{
+    UARTFlushRx();
+
+   // vTaskSuspend(xMotorsTask);
+   // vTaskSuspend(xMovementTask);
+    vTaskResume(xBrainTask);
+   sendEvent(UBOT_STOPPED);
+
+    return(0);
+}
+
+
 
 
 // ==============================================================================
@@ -223,6 +253,8 @@ tCmdLineEntry g_psCmdTable[] =
     { "prox",     Cmd_prox,      "     : Show distance detected by proximity sensor"},
     { "cpu",      Cmd_cpu,       "      : Show CPU usage" },
     { "free",     Cmd_free,      "     : Show free memory" },
+    { "stop",     Cmd_stop,       "     : Stop all task"},
+    { "resume",   Cmd_resume,     "     : Resume all task"},
 #if ( configUSE_TRACE_FACILITY == 1 )
 	{ "tasks",    Cmd_tasks,     "    : Show tasks information" },
 #endif
