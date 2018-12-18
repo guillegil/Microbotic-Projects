@@ -202,10 +202,12 @@ int Cmd_prox(int argc, char *argv[])
 {
     UARTFlushRx();
 
+    UARTprintf("\n");
+
     while(UARTRxBytesAvail() == 0)
     {
         float data = get_distance();
-        UARTprintf("%dmm\n", get_distance()); //UARTprintf("%f\n",get_distance());
+        UARTprintf("\033[2J\033[H%dmm        \n", get_distance()); //UARTprintf("%f\n",get_distance());
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 
