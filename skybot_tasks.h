@@ -31,7 +31,7 @@ struct MovementCommand
 
 inline void sendEvent(uint8_t id);
 inline void sendEventFromISR(uint8_t id, portBASE_TYPE higherPriorityTaskWoken);
-xQueueHandle brainQueue;
+xQueueHandle reactiveQueue;
 struct Event
 {
     uint8_t id;
@@ -39,6 +39,10 @@ struct Event
 #define UBOT_STOPPED        (0)
 #define COLLISION_START     (1)
 #define COLLISION_END       (2)
+#define ENEMY_FOUND         (3)
+#define ENEMY_LOST          (4)
+#define POSITION_IN         (5)
+#define POSITION_OUT        (6)
 
 void init_tasks();
 short get_distance();

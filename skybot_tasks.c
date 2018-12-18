@@ -39,13 +39,13 @@ inline void setSpeed(float right, float left)
 inline void sendEvent(uint8_t id)
 {
     struct Event event = {id};
-    xQueueSend(brainQueue, &event, portMAX_DELAY);
+    xQueueSend(reactiveQueue, &event, portMAX_DELAY);
 }
 
 inline void sendEventFromISR(uint8_t id, portBASE_TYPE higherPriorityTaskWoken)
 {
     struct Event event = {id};
-    xQueueSendFromISR(brainQueue, &event, &higherPriorityTaskWoken);
+    xQueueSendFromISR(reactiveQueue, &event, &higherPriorityTaskWoken);
 }
 
 void move(int16_t distance)
@@ -203,69 +203,31 @@ static portTASK_FUNCTION(MotorsTask, pvParameters)
     //vTaskDelete(NULL);
 }
 
-static portTASK_FUNCTION(BrainTask, pvParameters)
+static portTASK_FUNCTION(ReactiveTask, pvParameters)
 {
     struct Event event;
-    bool dodging, turning, long_side;
-
-    dodging = false;
-    turning = false;
-    long_side = true;
 
     setSpeed(0, 0);
 
-    move(180);
-
     while(true)
     {
-        xQueueReceive(brainQueue, &event, portMAX_DELAY);
+        xQueueReceive(reactiveQueue, &event, portMAX_DELAY);
 
         switch(event.id)
         {
+            case UBOT_STOPPED:
+                break;
             case COLLISION_START:
-                dodging = true;
-                turning = false;
-                move(-50);
                 break;
             case COLLISION_END:
                 break;
-            case UBOT_STOPPED:
-                if(dodging)
-                {
-                    if(!turning)
-                    {
-                        turn(-90);
-                        turning = true;
-                    }
-                    else
-                    {
-                        dodging = false;
-                        long_side = true;
-                        move(180);
-                    }
-                }
-                else
-                {
-                    if(turning)
-                    {
-                        turning = false;
-                        if(long_side)
-                        {
-                            long_side = false;
-                            move(120);
-                        }
-                        else
-                        {
-                            long_side = true;
-                            move(180);
-                        }
-                    }
-                    else
-                    {
-                        turning = true;
-                        turn(90);
-                    }
-                }
+            case ENEMY_FOUND:
+                break;
+            case ENEMY_LOST:
+                break;
+            case POSITION_OUT:
+                break;
+            case POSITION_IN:
                 break;
         }
 
@@ -323,7 +285,7 @@ static portTASK_FUNCTION(MovementTask, pvParameters)
 void init_tasks()
 {
     motorsQueue = xQueueCreate(2, sizeof(struct Speed));
-    brainQueue = xQueueCreate(1, sizeof(uint8_t));
+    reactiveQueue = xQueueCreate(1, sizeof(uint8_t));
     movementQueue = xQueueCreate(3, sizeof(struct MovementCommand));
 
 
@@ -342,7 +304,7 @@ void init_tasks()
         while(1);
     }
 
-    if((xTaskCreate(BrainTask, "BrainTask", 256, NULL, tskIDLE_PRIORITY + 1, NULL)) != pdTRUE)
+    if((xTaskCreate(ReactiveTask, "ReactiveTask", 256, NULL, tskIDLE_PRIORITY + 1, NULL)) != pdTRUE)
     {
         while(1);
     }
