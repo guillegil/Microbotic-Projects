@@ -130,8 +130,10 @@ void ADCConfig(void)
        //TimerEnable(TIMER5_BASE, TIMER_A);
 }
 
-void EncoderConf(void)
+void OpticalSensorsConf(void)
 {
+    /*
+    TODO: delete this block
     SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER3);
     while(!SysCtlPeripheralReady(SYSCTL_PERIPH_TIMER3))    // Wait for TIMER3 to be ready
     {
@@ -147,16 +149,17 @@ void EncoderConf(void)
     TimerIntEnable(TIMER3_BASE, TIMER_TIMA_TIMEOUT);
     IntPrioritySet(INT_TIMER3A, configMAX_SYSCALL_INTERRUPT_PRIORITY);
     IntEnable(INT_TIMER4A);
+    */
 
-    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOB);
-    while(!SysCtlPeripheralReady(SYSCTL_PERIPH_GPIOB))    // Wait for GPIO_PF to be ready
+    SysCtlPeripheralEnable(OPTICAL_SENSORS_GPIO_PERIPH);
+    while(!SysCtlPeripheralReady(OPTICAL_SENSORS_GPIO_PERIPH))    // Wait for GPIO_PF to be ready
 
-    SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_GPIOB);
+    SysCtlPeripheralSleepEnable(OPTICAL_SENSORS_GPIO_PERIPH);
 
-    GPIOPinTypeGPIOInput(GPIO_PORTB_BASE, GPIO_PIN_1 | GPIO_PIN_2);
-    GPIOIntTypeSet(GPIO_PORTB_BASE, GPIO_INT_PIN_1 | GPIO_PIN_2, GPIO_BOTH_EDGES) ;
-    GPIOIntClear(GPIO_PORTB_BASE, GPIO_INT_PIN_1 | GPIO_PIN_2);
-    GPIOIntEnable(GPIO_PORTB_BASE, GPIO_INT_PIN_1 | GPIO_PIN_2);
+    GPIOPinTypeGPIOInput(OPTICAL_SENSORS_GPIO_BASE, ALL_OPTICAL_SENSOR_PINS);
+    GPIOIntTypeSet(OPTICAL_SENSORS_GPIO_BASE, ALL_OPTICAL_SENSOR_PINS, GPIO_BOTH_EDGES) ;
+    GPIOIntClear(OPTICAL_SENSORS_GPIO_BASE, ALL_OPTICAL_SENSOR_PINS);
+    GPIOIntEnable(OPTICAL_SENSORS_GPIO_BASE, ALL_OPTICAL_SENSOR_PINS);
     IntPrioritySet(INT_GPIOB, configMAX_SYSCALL_INTERRUPT_PRIORITY);
     IntEnable(INT_GPIOB);
 }
@@ -299,7 +302,7 @@ int main(void)
     // Create tasks
     //
     WhiskerConf();
-    EncoderConf();
+    OpticalSensorsConf();
     ADCConfig();
 
     init_tasks();
@@ -340,25 +343,39 @@ void ISR_WhiskerSensor(void)
     portEND_SWITCHING_ISR(higherPriorityTaskWoken);
 }
 
-void ISR_EncoderSensor(void)
+
+void ISR_OpticalSensor(void)
 {
     portBASE_TYPE higherPriorityTaskWoken = pdFALSE;
-    struct MovementCommand command;
-    command.id = REGISTER_MOVEMENT;
 
-    if(GPIOIntStatus(GPIO_PORTB_BASE, GPIO_PIN_1) == GPIO_INT_PIN_1)
+
+    if(GPIOIntStatus(OPTICAL_SENSORS_GPIO_BASE, FLOOR_SENSOR_PIN) == FLOOR_SENSOR_PIN)
     {
-        command.parameter = RIGHT_WHEEL;
-        GPIOIntClear(GPIO_PORTB_BASE, GPIO_INT_PIN_1);
+        if(GPIOPinRead(OPTICAL_SENSORS_GPIO_BASE, FLOOR_SENSOR_PIN) == 0)
+            sendEventFromISR(POSITION_IN, higherPriorityTaskWoken);
+        else
+            sendEventFromISR(POSITION_OUT, higherPriorityTaskWoken);
     }
     else
     {
-        command.parameter = LEFT_WHEEL;
-        GPIOIntClear(GPIO_PORTB_BASE, GPIO_INT_PIN_2);
+        struct MovementCommand command;
+        command.id = REGISTER_MOVEMENT;
+
+        if(GPIOIntStatus(OPTICAL_SENSORS_GPIO_BASE, RIGHT_ENCODER_PIN) == RIGHT_ENCODER_PIN)
+        {
+            command.parameter = RIGHT_WHEEL;
+            GPIOIntClear(OPTICAL_SENSORS_GPIO_BASE, RIGHT_ENCODER_PIN);
+        }
+        else
+        {
+            command.parameter = LEFT_WHEEL;
+            GPIOIntClear(OPTICAL_SENSORS_GPIO_BASE, LEFT_ENCODER_PIN);
+        }
+        xQueueSendFromISR(movementQueue, &command, &higherPriorityTaskWoken);
     }
-    xQueueSendFromISR(movementQueue, &command, &higherPriorityTaskWoken);
     portEND_SWITCHING_ISR(higherPriorityTaskWoken);
 }
+
 
 void ISR_DebounceTimer(void)            // It Reads from Whisker button after 25ms in order to avoid multiple reads.
 {

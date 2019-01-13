@@ -33,7 +33,7 @@ void ResetISR(void);
 static void NmiSR(void);
 static void FaultISR(void);
 static void IntDefaultHandler(void);
-void ISR_EncoderSensor(void);
+void ISR_OpticalSensor(void);
 //*****************************************************************************
 //
 // External declaration for the reset handler that is to be called when the
@@ -89,7 +89,7 @@ void (* const g_pfnVectors[])(void) =
     xPortPendSVHandler,                     // The PendSV handler
     xPortSysTickHandler,                    // The SysTick handler
     IntDefaultHandler,                      // GPIO Port A
-    ISR_EncoderSensor,                      // GPIO Port B
+    ISR_OpticalSensor,                      // GPIO Port B
     IntDefaultHandler,                      // GPIO Port C
     IntDefaultHandler,                      // GPIO Port D
     IntDefaultHandler,                      // GPIO Port E
