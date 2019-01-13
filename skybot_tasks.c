@@ -32,7 +32,7 @@ extern void vUARTTask( void *pvParameters );
 xQueueHandle SensorsQueue;
 xQueueHandle reactiveQueue;
 xQueueHandle motorsQueue;
-xQueueHandle movementQueue;
+xQueueHandle motionQueue;
 
 
 // Messages structures
@@ -41,12 +41,12 @@ struct Event
     uint8_t id;
 };
 
-struct MovementCommand
+struct MotionCommand
 {
     uint8_t id;
     int16_t parameter;
 };
-#define REGISTER_MOVEMENT   (0)
+#define REGISTER_STEP   (0)
 #define MOVE                (1)
 #define TURN                (2)
 
@@ -78,34 +78,34 @@ inline void sendEventFromISR(uint8_t id, portBASE_TYPE * higherPriorityTaskWoken
 
 void move(int16_t distance)
 {
-    struct MovementCommand command;
+    struct MotionCommand command;
     command.id = MOVE;
     command.parameter = distance;
-    xQueueSend(movementQueue, &command, portMAX_DELAY);
+    xQueueSend(motionQueue, &command, portMAX_DELAY);
 }
 
 void turn(int16_t angle)
 {
-    struct MovementCommand command;
+    struct MotionCommand command;
     command.id = TURN;
     command.parameter = angle;
-    xQueueSend(movementQueue, &command, portMAX_DELAY);
+    xQueueSend(motionQueue, &command, portMAX_DELAY);
 }
 
 void registerStep(int16_t wheel)
 {
-    struct MovementCommand command;
-    command.id = REGISTER_MOVEMENT;
+    struct MotionCommand command;
+    command.id = REGISTER_STEP;
     command.parameter = wheel;
-    xQueueSend(movementQueue, &command, portMAX_DELAY);
+    xQueueSend(motionQueue, &command, portMAX_DELAY);
 }
 
 void registerStepFromISR(int16_t wheel, portBASE_TYPE * higherPriorityTaskWoken)
 {
-    struct MovementCommand command;
-    command.id = REGISTER_MOVEMENT;
+    struct MotionCommand command;
+    command.id = REGISTER_STEP;
     command.parameter = wheel;
-    xQueueSendFromISR(movementQueue, &command, higherPriorityTaskWoken);
+    xQueueSendFromISR(motionQueue, &command, higherPriorityTaskWoken);
 }
 
 // Utility functions
@@ -272,14 +272,14 @@ static portTASK_FUNCTION(ReactiveTask, pvParameters)
 }
 
 
-static portTASK_FUNCTION(MovementTask, pvParameters)
+static portTASK_FUNCTION(MotionTask, pvParameters)
 {
     uint32_t remain_right_increments, remain_left_increments;
-    struct MovementCommand command;
+    struct MotionCommand command;
 
     while(true)
     {
-        xQueueReceive(movementQueue, &command, portMAX_DELAY);
+        xQueueReceive(motionQueue, &command, portMAX_DELAY);
 
         switch(command.id)
         {
@@ -301,7 +301,7 @@ static portTASK_FUNCTION(MovementTask, pvParameters)
                     setSpeed(MAX_BACKWARD_SPEED, MAX_FORWARD_SPEED);
                 break;
 
-            case REGISTER_MOVEMENT:
+            case REGISTER_STEP:
                 if(command.parameter == RIGHT_WHEEL)
                     remain_right_increments--;
                 else if(command.parameter == LEFT_WHEEL)
@@ -322,7 +322,7 @@ void init_tasks()
 {
     motorsQueue = xQueueCreate(2, sizeof(struct Speed));
     reactiveQueue = xQueueCreate(1, sizeof(uint8_t));
-    movementQueue = xQueueCreate(3, sizeof(struct MovementCommand));
+    motionQueue = xQueueCreate(3, sizeof(struct MotionCommand));
 
 
     if((xTaskCreate(vUARTTask, (portCHAR *)"Uart", 512,NULL,tskIDLE_PRIORITY + 1, NULL) != pdTRUE))
@@ -335,7 +335,7 @@ void init_tasks()
         while(1);
     }
 
-    if((xTaskCreate(MovementTask, "MovementTask", 256, NULL, tskIDLE_PRIORITY + 1, NULL)) != pdTRUE)
+    if((xTaskCreate(MotionTask, "MotionTask", 256, NULL, tskIDLE_PRIORITY + 1, NULL)) != pdTRUE)
     {
         while(1);
     }
