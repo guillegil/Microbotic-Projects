@@ -304,7 +304,7 @@ void init_tasks()
         while(1);
     }
 
-    if((xTaskCreate(ReactiveTask, "ReactiveTask", 256, NULL, tskIDLE_PRIORITY + 1, NULL)) != pdTRUE)
+    if((xTaskCreate(ReactiveTask, "ReactiveTask", 256, NULL, tskIDLE_PRIORITY + 1, &xReactiveTask)) != pdTRUE)
     {
         while(1);
     }

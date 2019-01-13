@@ -40,9 +40,6 @@
 // Personal includes
 #include "skybot_tasks.h"
 
-extern TaskHandle_t xMotorsTask;
-extern TaskHandle_t xMovementTask;
-extern TaskHandle_t xBrainTask;
 
 // ==============================================================================
 // The CPU usage in percent, in 16.16 fixed point format.
@@ -222,7 +219,7 @@ int Cmd_stop(int argc, char *argv[])
 
    // vTaskSuspend(xMotorsTask);
    // vTaskSuspend(xMovementTask);
-   vTaskSuspend(xBrainTask);
+   vTaskSuspend(xReactiveTask);
    setSpeed(0.0f, 0.0f);
 
 
@@ -235,7 +232,7 @@ int Cmd_resume(int argc, char *argv[])
 
    // vTaskSuspend(xMotorsTask);
    // vTaskSuspend(xMovementTask);
-    vTaskResume(xBrainTask);
+    vTaskResume(xReactiveTask);
    sendEvent(UBOT_STOPPED);
 
     return(0);

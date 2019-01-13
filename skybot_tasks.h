@@ -4,6 +4,11 @@
 #include <stdint.h>
 #include "FreeRTOS.h"
 #include "queue.h"
+#include "task.h"
+
+
+xTaskHandle xReactiveTask;
+
 
 inline void setSpeed(float right, float left);
 xQueueHandle motorsQueue;
