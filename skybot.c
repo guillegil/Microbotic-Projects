@@ -352,26 +352,22 @@ void ISR_OpticalSensor(void)
     if(GPIOIntStatus(OPTICAL_SENSORS_GPIO_BASE, FLOOR_SENSOR_PIN) == FLOOR_SENSOR_PIN)
     {
         if(GPIOPinRead(OPTICAL_SENSORS_GPIO_BASE, FLOOR_SENSOR_PIN) == 0)
-            sendEventFromISR(POSITION_IN, higherPriorityTaskWoken);
+            sendEventFromISR(POSITION_IN, &higherPriorityTaskWoken);
         else
-            sendEventFromISR(POSITION_OUT, higherPriorityTaskWoken);
+            sendEventFromISR(POSITION_OUT, &higherPriorityTaskWoken);
     }
     else
     {
-        struct MovementCommand command;
-        command.id = REGISTER_MOVEMENT;
-
         if(GPIOIntStatus(OPTICAL_SENSORS_GPIO_BASE, RIGHT_ENCODER_PIN) == RIGHT_ENCODER_PIN)
         {
-            command.parameter = RIGHT_WHEEL;
+            registerStepFromISR(RIGHT_WHEEL, &higherPriorityTaskWoken);
             GPIOIntClear(OPTICAL_SENSORS_GPIO_BASE, RIGHT_ENCODER_PIN);
         }
         else
         {
-            command.parameter = LEFT_WHEEL;
+            registerStepFromISR(LEFT_WHEEL, &higherPriorityTaskWoken);
             GPIOIntClear(OPTICAL_SENSORS_GPIO_BASE, LEFT_ENCODER_PIN);
         }
-        xQueueSendFromISR(movementQueue, &command, &higherPriorityTaskWoken);
     }
     portEND_SWITCHING_ISR(higherPriorityTaskWoken);
 }
@@ -383,12 +379,12 @@ void ISR_DebounceTimer(void)            // It Reads from Whisker button after 25
 
     if(!GPIOPinRead(GPIO_PORTF_BASE, GPIO_INT_PIN_0))                       // Send to BrainTask to stop (or change the direction) the ubot
     {
-        sendEventFromISR(COLLISION_START, higherPriorityTaskWoken);
+        sendEventFromISR(COLLISION_START, &higherPriorityTaskWoken);
         GPIOIntTypeSet(GPIO_PORTF_BASE, GPIO_INT_PIN_0, GPIO_RISING_EDGE) ;
     }
     else
     {
-        sendEventFromISR(COLLISION_END, higherPriorityTaskWoken);
+        sendEventFromISR(COLLISION_END, &higherPriorityTaskWoken);
         GPIOIntTypeSet(GPIO_PORTF_BASE, GPIO_INT_PIN_0, GPIO_FALLING_EDGE);
     }
 

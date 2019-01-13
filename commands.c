@@ -176,20 +176,10 @@ int Cmd_help(int argc, char *argv[])
 // ==============================================================================
 int Cmd_motor(int argc, char *argv[])
 {
-    struct Speed speed;
-
     if (argc != 3)
-    {
         UARTprintf("use: motor <right_speed> <left_speed>\n");
-    }
     else
-    {
-        speed.right = atof(argv[1]);
-        speed.left = atof(argv[2]);
-        xQueueSend(motorsQueue, &speed, portMAX_DELAY);
-
-    }
-
+        setSpeed(atof(argv[1]), atof(argv[2]));
 
     return(0);
 }

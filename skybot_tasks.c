@@ -27,9 +27,37 @@
 
 extern void vUARTTask( void *pvParameters );
 
+
+// Queues
 xQueueHandle SensorsQueue;
+xQueueHandle reactiveQueue;
+xQueueHandle motorsQueue;
+xQueueHandle movementQueue;
 
 
+// Messages structures
+struct Event
+{
+    uint8_t id;
+};
+
+struct MovementCommand
+{
+    uint8_t id;
+    int16_t parameter;
+};
+#define REGISTER_MOVEMENT   (0)
+#define MOVE                (1)
+#define TURN                (2)
+
+struct Speed
+{
+    float right;
+    float left;
+};
+
+
+// Communication functions
 inline void setSpeed(float right, float left)
 {
     struct Speed speed = {right, left};
@@ -42,10 +70,10 @@ inline void sendEvent(uint8_t id)
     xQueueSend(reactiveQueue, &event, portMAX_DELAY);
 }
 
-inline void sendEventFromISR(uint8_t id, portBASE_TYPE higherPriorityTaskWoken)
+inline void sendEventFromISR(uint8_t id, portBASE_TYPE * higherPriorityTaskWoken)
 {
     struct Event event = {id};
-    xQueueSendFromISR(reactiveQueue, &event, &higherPriorityTaskWoken);
+    xQueueSendFromISR(reactiveQueue, &event, higherPriorityTaskWoken);
 }
 
 void move(int16_t distance)
@@ -64,7 +92,7 @@ void turn(int16_t angle)
     xQueueSend(movementQueue, &command, portMAX_DELAY);
 }
 
-void registerMovemente(int16_t wheel)
+void registerStep(int16_t wheel)
 {
     struct MovementCommand command;
     command.id = REGISTER_MOVEMENT;
@@ -72,7 +100,15 @@ void registerMovemente(int16_t wheel)
     xQueueSend(movementQueue, &command, portMAX_DELAY);
 }
 
+void registerStepFromISR(int16_t wheel, portBASE_TYPE * higherPriorityTaskWoken)
+{
+    struct MovementCommand command;
+    command.id = REGISTER_MOVEMENT;
+    command.parameter = wheel;
+    xQueueSendFromISR(movementQueue, &command, higherPriorityTaskWoken);
+}
 
+// Utility functions
 void DodgeLeft()
 {
     struct Speed speed;
@@ -164,7 +200,7 @@ short get_distance()
 }
 
 
-
+// Task functions
 static portTASK_FUNCTION(MotorsTask, pvParameters)
 {
     struct Speed speed;
