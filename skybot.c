@@ -355,6 +355,7 @@ void ISR_OpticalSensor(void)
             sendEventFromISR(POSITION_IN, &higherPriorityTaskWoken);
         else
             sendEventFromISR(POSITION_OUT, &higherPriorityTaskWoken);
+        GPIOIntClear(OPTICAL_SENSORS_GPIO_BASE, FLOOR_SENSOR_PIN);
     }
     else
     {
