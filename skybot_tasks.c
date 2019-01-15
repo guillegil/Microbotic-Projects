@@ -320,9 +320,9 @@ static portTASK_FUNCTION(MotionTask, pvParameters)
 
 void init_tasks()
 {
-    motorsQueue = xQueueCreate(2, sizeof(struct Speed));
-    reactiveQueue = xQueueCreate(1, sizeof(uint8_t));
-    motionQueue = xQueueCreate(3, sizeof(struct MotionCommand));
+    motorsQueue = xQueueCreate(MOTORS_QUEUE_SIZE, sizeof(struct Speed));
+    reactiveQueue = xQueueCreate(REACTIVE_QUEUE_SIZE, sizeof(uint8_t));
+    motionQueue = xQueueCreate(MOTION_QUEUE_SIZE, sizeof(struct MotionCommand));
 
 
     if((xTaskCreate(vUARTTask, (portCHAR *)"Uart", 512,NULL,tskIDLE_PRIORITY + 1, NULL) != pdTRUE))

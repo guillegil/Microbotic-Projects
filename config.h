@@ -34,6 +34,10 @@
 #define FLOOR_SENSOR_PIN            GPIO_PIN_6
 #define ALL_OPTICAL_SENSOR_PINS     (RIGHT_ENCODER_PIN | LEFT_ENCODER_PIN | FLOOR_SENSOR_PIN)
 
+#define REACTIVE_QUEUE_SIZE         (4)
+#define MOTION_QUEUE_SIZE           (3)
+#define MOTORS_QUEUE_SIZE           (2)
+
 #define ENCODER_STRIPES             (36)
 #define WHEEL_DIAMETER              (59.0f)         // Millimeters
 #define WHEELS_SEPARATION           (93)            // Millimeters FIXME: MEASURE!!!!
