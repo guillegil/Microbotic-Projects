@@ -28,6 +28,7 @@
 // Variables globales
 
 extern xQueueHandle whisker_queue;
+extern xQueueHandle proximityQueue;
 
 /* An array to hold a count of the number of times each timer expires. */
 uint32_t ui32ExpireCounters =  0 ;
@@ -75,8 +76,6 @@ void vApplicationIdleHook(xTaskHandle *pxTask, signed char *pcTaskName)
 }
 //#endif
 
-
-
 //*****************************************************************************
 //
 // Configure the system clock and initialize all needed peripherals.
@@ -84,7 +83,7 @@ void vApplicationIdleHook(xTaskHandle *pxTask, signed char *pcTaskName)
 //*****************************************************************************
 void ADCConfig(void)
 {
-    /*
+
     SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER5);
       while(!SysCtlPeripheralReady(SYSCTL_PERIPH_TIMER5))    // Wait for TIMER5 to be ready
       {
@@ -95,7 +94,7 @@ void ADCConfig(void)
       TimerClockSourceSet(TIMER5_BASE,TIMER_CLOCK_SYSTEM);
       TimerConfigure(TIMER5_BASE, TIMER_CFG_PERIODIC);
       TimerLoadSet(TIMER5_BASE, TIMER_A, SysCtlClockGet() - 1);
-*/
+
 
        SysCtlPeripheralEnable(SYSCTL_PERIPH_ADC0);         // Enable ADC0
        while(!SysCtlPeripheralReady(SYSCTL_PERIPH_ADC0))    // Wait for ADC0 to be ready
@@ -115,19 +114,18 @@ void ADCConfig(void)
 
        ADCClockConfigSet(ADC0_BASE, ADC_CLOCK_RATE_FULL, 1);
 
-       ADCSequenceConfigure(ADC0_BASE, 1, ADC_TRIGGER_PROCESSOR, 0);
-       //TimerControlTrigger(TIMER5_BASE, TIMER_A, true);
+       ADCSequenceConfigure(ADC0_BASE, 1, ADC_TRIGGER_TIMER, 0);   // To trigger it from processor set to ADC_TRIGGER_PROCESSOR
+       TimerControlTrigger(TIMER5_BASE, TIMER_A, true);
 
        ADCSequenceStepConfigure(ADC0_BASE, 1, 0, ADC_CTL_IE | ADC_CTL_END | ADC_CTL_CH0); // Interrupt + Last seq + channel 0 selected
        ADCSequenceEnable(ADC0_BASE, 1);
-       /*
+
        ADCIntEnable(ADC0_BASE, 1);
        ADCIntClear(ADC0_BASE,1);
        IntPrioritySet(INT_ADC0SS1, configMAX_SYSCALL_INTERRUPT_PRIORITY);
        IntEnable(INT_ADC0SS1);
-       //IntMasterEnable(); // FIXME: remove this line (careful)
-       */
-       //TimerEnable(TIMER5_BASE, TIMER_A);
+
+       TimerEnable(TIMER5_BASE, TIMER_A);
 }
 
 void OpticalSensorsConf(void)
@@ -323,12 +321,15 @@ int main(void)
 
 void ISR_ProximitySensor(void)                          // Remove after
 {
-    portBASE_TYPE higherPriorityTaskWoken = pdFALSE;
-    uint32_t data_buff;
+   portBASE_TYPE higherPriorityTaskWoken = pdFALSE;
+   uint32_t data_buff;
+   uint16_t data;
 
-    ADCSequenceDataGet(ADC0_BASE, 1, &data_buff);
-    ADCIntClear(ADC0_BASE,1);
-    portEND_SWITCHING_ISR(higherPriorityTaskWoken);
+   ADCSequenceDataGet(ADC0_BASE, 1, &data_buff);
+   ADCIntClear(ADC0_BASE,1);
+
+   xQueueSendFromISR(proximityQueue, &data, &higherPriorityTaskWoken);
+   portEND_SWITCHING_ISR(higherPriorityTaskWoken);
 
 }
 
@@ -349,13 +350,29 @@ void ISR_OpticalSensor(void)
     portBASE_TYPE higherPriorityTaskWoken = pdFALSE;
 
 
-    if(GPIOIntStatus(OPTICAL_SENSORS_GPIO_BASE, FLOOR_SENSOR_PIN) == FLOOR_SENSOR_PIN)
+    if(GPIOIntStatus(OPTICAL_SENSORS_GPIO_BASE, FLOOR_SENSORS) == FLOOR_SENSORS)
     {
-        if(GPIOPinRead(OPTICAL_SENSORS_GPIO_BASE, FLOOR_SENSOR_PIN) == 0)
+        if(GPIOPinRead(OPTICAL_SENSORS_GPIO_BASE, RIGHT_FLOOR_SENSOR_PIN))
+        {
+            sendEventFromISR(POSITION_OUT_RIGHT, &higherPriorityTaskWoken);
+            GPIOIntClear(OPTICAL_SENSORS_GPIO_BASE, RIGHT_FLOOR_SENSOR_PIN);
+        }else if(GPIOPinRead(OPTICAL_SENSORS_GPIO_BASE, LEFT_FLOOR_SENSOR_PIN))
+        {
+            sendEventFromISR(POSITION_OUT_LEFT, &higherPriorityTaskWoken);
+            GPIOIntClear(OPTICAL_SENSORS_GPIO_BASE, LEFT_FLOOR_SENSOR_PIN);
+        }else
+        {
             sendEventFromISR(POSITION_IN, &higherPriorityTaskWoken);
-        else
-            sendEventFromISR(POSITION_OUT, &higherPriorityTaskWoken);
-        GPIOIntClear(OPTICAL_SENSORS_GPIO_BASE, FLOOR_SENSOR_PIN);
+            GPIOIntClear(OPTICAL_SENSORS_GPIO_BASE, FLOOR_SENSORS);
+        }
+
+
+//        if(GPIOPinRead(OPTICAL_SENSORS_GPIO_BASE, FLOOR_SENSOR_PIN) == 0)
+//            sendEventFromISR(POSITION_IN, &higherPriorityTaskWoken);
+//        else
+//            sendEventFromISR(POSITION_OUT, &higherPriorityTaskWoken);
+
+
     }
     else
     {

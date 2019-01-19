@@ -31,17 +31,25 @@
 #define OPTICAL_SENSORS_GPIO_BASE   GPIO_PORTB_BASE
 #define RIGHT_ENCODER_PIN           GPIO_PIN_1
 #define LEFT_ENCODER_PIN            GPIO_PIN_2
-#define FLOOR_SENSOR_PIN            GPIO_PIN_6
-#define ALL_OPTICAL_SENSOR_PINS     (RIGHT_ENCODER_PIN | LEFT_ENCODER_PIN | FLOOR_SENSOR_PIN)
+#define RIGHT_FLOOR_SENSOR_PIN      GPIO_PIN_6
+#define LEFT_FLOOR_SENSOR_PIN       GPIO_PIN_7
+
+#define FLOOR_SENSORS               (RIGHT_FLOOR_SENSOR_PIN | RIGHT_FLOOR_SENSOR_PIN)
+
+#define ALL_OPTICAL_SENSOR_PINS     (RIGHT_ENCODER_PIN | LEFT_ENCODER_PIN | RIGHT_FLOOR_SENSOR_PIN | LEFT_FLOOR_SENSOR_PIN)
 
 #define REACTIVE_QUEUE_SIZE         (4)
 #define MOTION_QUEUE_SIZE           (3)
 #define MOTORS_QUEUE_SIZE           (2)
+#define PROXIMITY_QUEUE_SIZE        (1)
 
 #define ENCODER_STRIPES             (36)
 #define WHEEL_DIAMETER              (59.0f)         // Millimeters
 #define WHEELS_SEPARATION           (93)            // Millimeters FIXME: MEASURE!!!!
 
 #define M_PI                        (3.14159f)      // Pi
+
+#define TURN_STATE                  (0)
+#define MOVE_STATE                  (1)
 
 #endif /* CONFIG_H_ */

@@ -33,6 +33,8 @@ xQueueHandle SensorsQueue;
 xQueueHandle reactiveQueue;
 xQueueHandle motorsQueue;
 xQueueHandle motionQueue;
+xQueueHandle proximityQueue;
+
 
 
 // Messages structures
@@ -56,7 +58,6 @@ struct Speed
     float left;
 };
 
-
 // Communication functions
 inline void setSpeed(float right, float left)
 {
@@ -76,7 +77,7 @@ inline void sendEventFromISR(uint8_t id, portBASE_TYPE * higherPriorityTaskWoken
     xQueueSendFromISR(reactiveQueue, &event, higherPriorityTaskWoken);
 }
 
-void move(int16_t distance)
+void move(int16_t distance)   // Distancia en mm
 {
     struct MotionCommand command;
     command.id = MOVE;
@@ -84,7 +85,7 @@ void move(int16_t distance)
     xQueueSend(motionQueue, &command, portMAX_DELAY);
 }
 
-void turn(int16_t angle)
+void turn(int16_t angle)        // Gira a la derecha si el ángulo es negativo.
 {
     struct MotionCommand command;
     command.id = TURN;
@@ -166,14 +167,12 @@ short proximity_lut[LUT_SIZE] =
 };
 
 
-short get_distance()
+
+
+uint16_t calculte_distance(uint32_t data)
 {
     short out, inc;
     unsigned int imin, imid, imax;
-    uint32_t data;
-
-    ADCProcessorTrigger(ADC0_BASE, 1);          // Causes a processor trigger for a sample sequence
-    ADCSequenceDataGet(ADC0_BASE, 1, &data);
 
     imin = 0;
     imax = LUT_SIZE - 1;
@@ -195,6 +194,19 @@ short get_distance()
 
     inc = 20 * (proximity_lut[imin] - data) / (proximity_lut[imin] - proximity_lut[imax]);
     out = 20 * (1 + imin) + inc;
+
+    return out;
+}
+
+short get_distance()
+{
+    short out;
+    uint32_t data;
+
+    ADCProcessorTrigger(ADC0_BASE, 1);          // Causes a processor trigger for a sample sequence
+    ADCSequenceDataGet(ADC0_BASE, 1, &data);
+
+    out = calculte_distance(data);
 
     return out;
 }
@@ -242,6 +254,7 @@ static portTASK_FUNCTION(MotorsTask, pvParameters)
 static portTASK_FUNCTION(ReactiveTask, pvParameters)
 {
     struct Event event;
+    uint8_t state = TURN_STATE;
 
     setSpeed(0, 0);
 
@@ -252,18 +265,54 @@ static portTASK_FUNCTION(ReactiveTask, pvParameters)
         switch(event.id)
         {
             case UBOT_STOPPED:
+                switch(state)
+                {
+                    case TURN_STATE:
+                        state = MOVE_STATE;
+                        break;
+                    case MOVE_STATE:
+                        state = TURN_STATE;
+                        break;
+                }
                 break;
             case COLLISION_START:
                 break;
             case COLLISION_END:
                 break;
             case ENEMY_FOUND:
+                setSpeed(1.0f, 1.0f);
                 break;
             case ENEMY_LOST:
+                // ¿Busca?
+                state = TURN_STATE;
+                if(!state)
+                    turn(180);
+                else
+                    move(200);
                 break;
-            case POSITION_OUT:
+            case POSITION_OUT_LEFT:
+                vTaskSuspend(xProximityTask);
+                xQueueReset(reactiveQueue);
+                state = TURN_STATE;
+                if(!state)
+                    turn(-135);
+                else
+                    move(150);
+
+                break;
+            case POSITION_OUT_RIGHT:
+                vTaskSuspend(xProximityTask);
+                xQueueReset(reactiveQueue);
+                state = TURN_STATE;
+                if(!state)
+                    turn(135);
+                else
+                    move(150);
+
                 break;
             case POSITION_IN:
+                vTaskResume(xProximityTask);
+
                 break;
         }
 
@@ -315,15 +364,37 @@ static portTASK_FUNCTION(MotionTask, pvParameters)
         }
 
     }
-
 }
+
+static portTASK_FUNCTION(proximityTask, pvParameters)
+{
+    uint32_t data;
+    uint16_t distance;
+    struct Event event;
+
+
+    while(1)
+    {
+        xQueueReceive(proximityQueue, &data, portMAX_DELAY);
+        distance = calculte_distance(data);
+
+        if(distance > 20 && distance < LUT_SIZE*20)
+            event.id = ENEMY_FOUND;
+        else
+            event.id = ENEMY_LOST;
+
+        xQueueSend(reactiveQueue, &event, portMAX_DELAY);
+    }
+}
+
+
 
 void init_tasks()
 {
     motorsQueue = xQueueCreate(MOTORS_QUEUE_SIZE, sizeof(struct Speed));
     reactiveQueue = xQueueCreate(REACTIVE_QUEUE_SIZE, sizeof(uint8_t));
     motionQueue = xQueueCreate(MOTION_QUEUE_SIZE, sizeof(struct MotionCommand));
-
+    proximityQueue = xQueueCreate(PROXIMITY_QUEUE_SIZE, sizeof(struct MotionCommand));
 
     if((xTaskCreate(vUARTTask, (portCHAR *)"Uart", 512,NULL,tskIDLE_PRIORITY + 1, NULL) != pdTRUE))
     {
@@ -344,6 +415,12 @@ void init_tasks()
     {
         while(1);
     }
+
+    if((xTaskCreate(proximityTask, "proximityTask", 256, NULL, tskIDLE_PRIORITY + 1, &xProximityTask)) != pdTRUE)
+    {
+        while(1);
+    }
+
 
 }
 
