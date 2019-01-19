@@ -110,7 +110,7 @@ void ADCConfig(void)
 
        SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_GPIOE);
 
-       GPIOPinTypeADC(GPIO_PORTE_BASE,GPIO_PIN_3);
+       GPIOPinTypeADC(ADC_PROX_GPIO_BASE, ADC_PROX_GPIO_PIN);
 
        ADCClockConfigSet(ADC0_BASE, ADC_CLOCK_RATE_FULL, 1);
 

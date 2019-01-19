@@ -25,6 +25,8 @@
 #define MIN_MOTORS_DUTYCYCLE        0.052f          // Stop duty cycle
 
 #define ADC_PROX_BASE               ADC0_BASE
+#define ADC_PROX_GPIO_BASE          GPIO_PORTE_BASE
+#define ADC_PROX_GPIO_PIN           GPIO_PIN_3
 
 #define PWM_OUT_RIGHT_MOTOR         PWM_OUT_6       // Right wheel PWM output used in some PWM api functions
 #define PWM_OUT_LEFT_MOTOR          PWM_OUT_7       // Left wheel PWM output used in some PWM api functions
