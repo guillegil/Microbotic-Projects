@@ -51,5 +51,6 @@
 
 #define TURN_STATE                  (0)
 #define MOVE_STATE                  (1)
+#define INWARD_STATE                (2)
 
 #endif /* CONFIG_H_ */

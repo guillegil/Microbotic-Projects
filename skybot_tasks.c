@@ -272,7 +272,13 @@ static portTASK_FUNCTION(ReactiveTask, pvParameters)
                         break;
                     case MOVE_STATE:
                         state = TURN_STATE;
+                        move(200);
                         break;
+                    case INWARD_STATE:
+                        state = TURN_STATE;
+                        move(150);
+                        break;
+
                 }
                 break;
             case COLLISION_START:
@@ -283,31 +289,25 @@ static portTASK_FUNCTION(ReactiveTask, pvParameters)
                 setSpeed(1.0f, 1.0f);
                 break;
             case ENEMY_LOST:
-                // ¿Busca?
-                state = TURN_STATE;
-                if(!state)
-                    turn(180);
-                else
-                    move(200);
+                state = MOVE_STATE;
+                turn(180);
+
                 break;
             case POSITION_OUT_LEFT:
                 vTaskSuspend(xProximityTask);
                 xQueueReset(reactiveQueue);
-                state = TURN_STATE;
-                if(!state)
-                    turn(-135);
-                else
-                    move(150);
+                state = INWARD_STATE;
+
+                turn(-135);
 
                 break;
             case POSITION_OUT_RIGHT:
                 vTaskSuspend(xProximityTask);
                 xQueueReset(reactiveQueue);
                 state = TURN_STATE;
-                if(!state)
-                    turn(135);
-                else
-                    move(150);
+                state = INWARD_STATE;
+
+                turn(135);
 
                 break;
             case POSITION_IN:
