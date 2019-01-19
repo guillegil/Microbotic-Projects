@@ -31,6 +31,7 @@
 #include "driverlib/uart.h"
 #include "driverlib/sysctl.h"
 #include "driverlib/rom.h"
+#include "driverlib/adc.h"
 
 /* Other TIVA includes */
 #include "utils/cpu_usage.h"
@@ -39,6 +40,7 @@
 
 // Personal includes
 #include "skybot_tasks.h"
+#include "config.h"
 
 
 // ==============================================================================
@@ -203,6 +205,26 @@ int Cmd_prox(int argc, char *argv[])
     return(0);
 }
 
+int Cmd_calib(int argc, char *argv[])
+{
+    unsigned k;
+    uint32_t data;
+    uint32_t average;
+
+    ADCSequenceConfigure(ADC_PROX_BASE, 1, ADC_TRIGGER_PROCESSOR, 0);
+    for(k = 0; k < PROXIMITY_CALIBRATION_SAMPLES; ++k)
+    {
+        ADCProcessorTrigger(ADC_PROX_BASE, 1);          // Causes a processor trigger for a sample sequence
+        ADCSequenceDataGet(ADC_PROX_BASE, 1, &data);
+        average += data;
+    }
+    average /= PROXIMITY_CALIBRATION_SAMPLES;
+    UARTprintf("%u", (unsigned)average);
+    ADCSequenceConfigure(ADC_PROX_BASE, 1, ADC_TRIGGER_TIMER, 0);
+
+    return(0);
+}
+
 int Cmd_stop(int argc, char *argv[])
 {
     UARTFlushRx();
@@ -240,6 +262,7 @@ tCmdLineEntry g_psCmdTable[] =
     { "?",        Cmd_help,      "        : Same as help" },
     { "motor",    Cmd_motor,     "    : Set right and left motor speed"},
     { "prox",     Cmd_prox,      "     : Show distance detected by proximity sensor"},
+    { "calib",    Cmd_calib,     "    : Get proximity average value"},
     { "cpu",      Cmd_cpu,       "      : Show CPU usage" },
     { "free",     Cmd_free,      "     : Show free memory" },
     { "stop",     Cmd_stop,       "     : Stop all task"},

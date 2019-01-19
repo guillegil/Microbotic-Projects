@@ -24,6 +24,8 @@
 #define NEUTRAL_MOTORS_DUTYCYCLE    0.076f          // Max backward speed duty cycle
 #define MIN_MOTORS_DUTYCYCLE        0.052f          // Stop duty cycle
 
+#define ADC_PROX_BASE               ADC0_BASE
+
 #define PWM_OUT_RIGHT_MOTOR         PWM_OUT_6       // Right wheel PWM output used in some PWM api functions
 #define PWM_OUT_LEFT_MOTOR          PWM_OUT_7       // Left wheel PWM output used in some PWM api functions
 
@@ -52,5 +54,7 @@
 #define TURN_STATE                  (0)
 #define MOVE_STATE                  (1)
 #define INWARD_STATE                (2)
+
+#define PROXIMITY_CALIBRATION_SAMPLES   10
 
 #endif /* CONFIG_H_ */
