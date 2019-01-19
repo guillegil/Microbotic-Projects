@@ -219,7 +219,7 @@ int Cmd_calib(int argc, char *argv[])
         average += data;
     }
     average /= PROXIMITY_CALIBRATION_SAMPLES;
-    UARTprintf("%u", (unsigned)average);
+    UARTprintf("%u\n", (unsigned)average);
     ADCSequenceConfigure(ADC_PROX_BASE, 1, ADC_TRIGGER_TIMER, 0);
 
     return(0);
