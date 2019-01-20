@@ -34,8 +34,8 @@ xQueueHandle reactiveQueue;
 xQueueHandle motorsQueue;
 xQueueHandle motionQueue;
 xQueueHandle proximityQueue;
-
-
+xQueueHandle proximityQueue;
+xQueueHandle arbiterQueue;
 
 // Messages structures
 struct Event
@@ -48,7 +48,7 @@ struct MotionCommand
     uint8_t id;
     int16_t parameter;
 };
-#define REGISTER_STEP   (0)
+#define REGISTER_STEP       (0)
 #define MOVE                (1)
 #define TURN                (2)
 
@@ -57,6 +57,15 @@ struct Speed
     float right;
     float left;
 };
+
+struct Positions
+{
+    float bot_x;
+    float bot_y;
+    float enemy_x;
+    float enemy_y;
+};
+
 
 // Communication functions
 inline void setSpeed(float right, float left)
@@ -256,7 +265,7 @@ static portTASK_FUNCTION(ReactiveTask, pvParameters)
     struct Event event;
     uint8_t state = TURN_STATE;
 
-    setSpeed(0, 0);
+    turn(360);
 
     while(true)
     {
@@ -268,15 +277,16 @@ static portTASK_FUNCTION(ReactiveTask, pvParameters)
                 switch(state)
                 {
                     case TURN_STATE:
+                        turn(360);
                         state = MOVE_STATE;
                         break;
                     case MOVE_STATE:
-                        state = TURN_STATE;
                         move(200);
+                        state = TURN_STATE;
                         break;
                     case INWARD_STATE:
-                        state = TURN_STATE;
                         move(150);
+                        state = TURN_STATE;
                         break;
 
                 }
@@ -286,28 +296,33 @@ static portTASK_FUNCTION(ReactiveTask, pvParameters)
             case COLLISION_END:
                 break;
             case ENEMY_FOUND:
-                setSpeed(1.0f, 1.0f);
+                move(1000);
                 break;
             case ENEMY_LOST:
+                turn(360);
+
                 state = MOVE_STATE;
-                turn(180);
 
                 break;
             case POSITION_OUT_LEFT:
                 vTaskSuspend(xProximityTask);
                 xQueueReset(reactiveQueue);
+
+
+                if(state == TURN_STATE)
+                    turn(-135);
+
                 state = INWARD_STATE;
-
-                turn(-135);
-
                 break;
             case POSITION_OUT_RIGHT:
                 vTaskSuspend(xProximityTask);
                 xQueueReset(reactiveQueue);
-                state = TURN_STATE;
-                state = INWARD_STATE;
 
-                turn(135);
+
+                if(state == TURN_STATE)
+                    turn(-135);
+
+                state = INWARD_STATE;
 
                 break;
             case POSITION_IN:
@@ -371,19 +386,40 @@ static portTASK_FUNCTION(proximityTask, pvParameters)
     uint32_t data;
     uint16_t distance;
     struct Event event;
-
+    uint8_t flag = 1;
 
     while(1)
     {
         xQueueReceive(proximityQueue, &data, portMAX_DELAY);
         distance = calculte_distance(data);
 
-        if(distance > 20 && distance < LUT_SIZE*20)
+        if(flag == 1 && (distance > 20 && distance < LUT_SIZE*20))
+        {
             event.id = ENEMY_FOUND;
-        else
+            xQueueSend(reactiveQueue, &event, portMAX_DELAY);
+            flag = 0;
+        }
+        else if(flag == 0 && (distance <= 20 || distance >= LUT_SIZE*20))
+        {
             event.id = ENEMY_LOST;
+            xQueueSend(reactiveQueue, &event, portMAX_DELAY);
+            flag = 1;
+        }
+    }
+}
 
-        xQueueSend(reactiveQueue, &event, portMAX_DELAY);
+static portTASK_FUNCTION(arbiterTask, pvParameters)
+{
+    struct Positions pos;
+    memset(&pos, 0, sizeof(struct Positions));
+
+
+    bot_x = bot_y = 0;
+    enemy_x = enemy_y = 0;
+
+    while(true)
+    {
+        xQueueReceive(proximityQueue, &data, portMAX_DELAY);
     }
 }
 
@@ -394,7 +430,8 @@ void init_tasks()
     motorsQueue = xQueueCreate(MOTORS_QUEUE_SIZE, sizeof(struct Speed));
     reactiveQueue = xQueueCreate(REACTIVE_QUEUE_SIZE, sizeof(uint8_t));
     motionQueue = xQueueCreate(MOTION_QUEUE_SIZE, sizeof(struct MotionCommand));
-    proximityQueue = xQueueCreate(PROXIMITY_QUEUE_SIZE, sizeof(struct MotionCommand));
+    proximityQueue = xQueueCreate(PROXIMITY_QUEUE_SIZE, sizeof(uint32_t));
+    arbiterQueue = xQueueCreate(ARBITER_QUEUE_SIZE, sizeof(struct Positions));
 
     if((xTaskCreate(vUARTTask, (portCHAR *)"Uart", 512,NULL,tskIDLE_PRIORITY + 1, NULL) != pdTRUE))
     {
@@ -417,6 +454,11 @@ void init_tasks()
     }
 
     if((xTaskCreate(proximityTask, "proximityTask", 256, NULL, tskIDLE_PRIORITY + 1, &xProximityTask)) != pdTRUE)
+    {
+        while(1);
+    }
+
+    if((xTaskCreate(arbiterTask, "arbiterTask", 256, NULL, tskIDLE_PRIORITY + 1, NULL)) != pdTRUE)
     {
         while(1);
     }

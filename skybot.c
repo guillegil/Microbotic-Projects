@@ -323,7 +323,7 @@ void ISR_ProximitySensor(void)                          // Remove after
 {
    portBASE_TYPE higherPriorityTaskWoken = pdFALSE;
    uint32_t data_buff;
-   uint16_t data;
+   uint32_t data;
 
    ADCSequenceDataGet(ADC0_BASE, 1, &data_buff);
    ADCIntClear(ADC0_BASE,1);
