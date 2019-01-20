@@ -17,6 +17,8 @@
 #define MOTORS_FREQUENCY            50              // Frequency (Hz) of the servomotors
 //#define SERVOM_DUTYCYCLE          0.076           // Duty cycle of the servomotors
 
+#define PROX_SAMPLES_FREQ           100
+
 #define MAX_FORWARD_SPEED           1.0f            // Max value passed to MotorsQueue for forward movement
 #define MAX_BACKWARD_SPEED          -1.0f           // Max value passed to MotorsQueue for backward movement
 

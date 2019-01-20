@@ -42,6 +42,8 @@
 #include "skybot_tasks.h"
 #include "config.h"
 
+extern xQueueHandle proximityQueue;
+
 
 // ==============================================================================
 // The CPU usage in percent, in 16.16 fixed point format.
@@ -211,16 +213,15 @@ int Cmd_calib(int argc, char *argv[])
     uint32_t data;
     uint32_t average;
 
-    ADCSequenceConfigure(ADC_PROX_BASE, 1, ADC_TRIGGER_PROCESSOR, 0);
+    average = 0;
+
     for(k = 0; k < PROXIMITY_CALIBRATION_SAMPLES; ++k)
     {
-        ADCProcessorTrigger(ADC_PROX_BASE, 1);          // Causes a processor trigger for a sample sequence
-        ADCSequenceDataGet(ADC_PROX_BASE, 1, &data);
+        xQueueReceive(proximityQueue, &data, portMAX_DELAY);
         average += data;
     }
     average /= PROXIMITY_CALIBRATION_SAMPLES;
     UARTprintf("%u\n", (unsigned)average);
-    ADCSequenceConfigure(ADC_PROX_BASE, 1, ADC_TRIGGER_TIMER, 0);
 
     return(0);
 }

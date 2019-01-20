@@ -93,7 +93,7 @@ void ADCConfig(void)
 
       TimerClockSourceSet(TIMER5_BASE,TIMER_CLOCK_SYSTEM);
       TimerConfigure(TIMER5_BASE, TIMER_CFG_PERIODIC);
-      TimerLoadSet(TIMER5_BASE, TIMER_A, SysCtlClockGet() - 1);
+      TimerLoadSet(TIMER5_BASE, TIMER_A, (SysCtlClockGet() / PROX_SAMPLES_FREQ) - 1);
 
 
        SysCtlPeripheralEnable(SYSCTL_PERIPH_ADC0);         // Enable ADC0
@@ -322,10 +322,9 @@ int main(void)
 void ISR_ProximitySensor(void)                          // Remove after
 {
    portBASE_TYPE higherPriorityTaskWoken = pdFALSE;
-   uint32_t data_buff;
    uint32_t data;
 
-   ADCSequenceDataGet(ADC0_BASE, 1, &data_buff);
+   ADCSequenceDataGet(ADC0_BASE, 1, &data);
    ADCIntClear(ADC0_BASE,1);
 
    xQueueSendFromISR(proximityQueue, &data, &higherPriorityTaskWoken);
