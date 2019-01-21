@@ -224,7 +224,7 @@ void registerStepFromISR(int16_t wheel, portBASE_TYPE * higherPriorityTaskWoken)
 void sendMappingCommand(uint8_t id)
 {
     struct MappingCommand command;
-    command.id = type;
+    command.id = id;
     xQueueSend(mappingQueue, &command, portMAX_DELAY);
 }
 
@@ -233,7 +233,7 @@ void sendPositions(float bot_x, float bot_y, float bot_angle, float enemy_x, flo
     struct Positions positions;
     positions.bot_x = bot_x;
     positions.bot_y = bot_y;
-    positions.bot_azimuthal = bot_angle;
+    positions.azimuthal = bot_angle;
     positions.enemy_x = enemy_x;
     positions.enemy_y = enemy_y;
     xQueueSend(arbiterQueue, &positions, portMAX_DELAY);
@@ -490,7 +490,7 @@ static portTASK_FUNCTION(MappingTask, pvParameters)
     {
         struct Positions pos;
 
-        xQueueReceive(MappingQueue, &command, portMAX_DELAY);
+        xQueueReceive(mappingQueue, &command, portMAX_DELAY);
 
         switch(command.id)
         {
@@ -505,22 +505,24 @@ static portTASK_FUNCTION(MappingTask, pvParameters)
             case LEFT_MOTION:
                 bot_angle += STEP_ANGLE_RAD;
                 break;
-            case LEFT_MOTION:
+            case RIGHT_MOTION:
                 bot_angle -= STEP_ANGLE_RAD;
                 break;
         }
 
         if(command.id == INTERSECTION_RIGHT  ||  command.id == INTERSECTION_LEFT)
         {
+            float x_new, y_new;
+
             if(command.id == INTERSECTION_RIGHT)
             {
-                float x_new = bot_x + FLOOR_SENSOR_SEPARATION * sinf(bot_angle);
-                float y_new = bot_y + FLOOR_SENSOR_SEPARATION * cosf(bot_angle);
+                x_new = bot_x + FLOOR_SENSOR_SEPARATION * sinf(bot_angle);
+                y_new = bot_y + FLOOR_SENSOR_SEPARATION * cosf(bot_angle);
             }
             else
             {
-                float x_new = bot_x - FLOOR_SENSOR_SEPARATION * sinf(bot_angle);
-                float y_new = bot_y - FLOOR_SENSOR_SEPARATION * cosf(bot_angle);
+                x_new = bot_x - FLOOR_SENSOR_SEPARATION * sinf(bot_angle);
+                y_new = bot_y - FLOOR_SENSOR_SEPARATION * cosf(bot_angle);
             }
 
             if(saved_points > 0)
@@ -592,11 +594,11 @@ static portTASK_FUNCTION(MotionTask, pvParameters)
                 break;
 
             case TURN:
-                remain_right_increments = (unsigned) abs(command.parameter / STEP_ANGLE_DEG;
+                remain_right_increments = (unsigned) abs(command.parameter) / STEP_ANGLE_DEG;
                 remain_left_increments = remain_right_increments;
                 if(command.parameter > 0)
                 {
-                    motion = LEFT_MOTION
+                    motion = LEFT_MOTION;
                     setSpeed(MAX_FORWARD_SPEED, MAX_BACKWARD_SPEED);
                 }
                 else
@@ -676,7 +678,7 @@ void init_tasks()
     motionQueue = xQueueCreate(MOTION_QUEUE_SIZE, sizeof(struct MotionCommand));
     proximityQueue = xQueueCreate(PROXIMITY_QUEUE_SIZE, sizeof(uint32_t));
     arbiterQueue = xQueueCreate(ARBITER_QUEUE_SIZE, sizeof(struct Positions));
-    mappingQueue
+    mappingQueue = xQueueCreate(MAPPING_QUEUE_SIZE, sizeof(struct MappingCommand));
 
     if((xTaskCreate(vUARTTask, (portCHAR *)"Uart", 512,NULL,tskIDLE_PRIORITY + 1, NULL) != pdTRUE))
     {

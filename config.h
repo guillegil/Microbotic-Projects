@@ -49,6 +49,7 @@
 #define MOTORS_QUEUE_SIZE           (2)
 #define PROXIMITY_QUEUE_SIZE        (1)
 #define ARBITER_QUEUE_SIZE          (1)
+#define MAPPING_QUEUE_SIZE          (5)
 
 #define ENCODER_STRIPES             (36.0f)
 #define WHEEL_DIAMETER              (59.0f)         // Millimeters
