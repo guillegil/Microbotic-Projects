@@ -29,6 +29,7 @@
 
 extern xQueueHandle whisker_queue;
 extern xQueueHandle proximityQueue;
+extern xQueueHandle reactiveQueue;
 
 /* An array to hold a count of the number of times each timer expires. */
 uint32_t ui32ExpireCounters =  0 ;
@@ -377,7 +378,7 @@ void ISR_FloorSensor(void)
         GPIOIntClear(FLOOR_SENSORS_GPIO_BASE, FLOOR_SENSORS);
     }
 
-
+    portEND_SWITCHING_ISR(higherPriorityTaskWoken);
 }
 
 
