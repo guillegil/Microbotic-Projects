@@ -9,6 +9,7 @@
 
 xTaskHandle xReactiveTask;
 xTaskHandle xProximityTask;
+xTaskHandle xArbiterTask;
 
 
 inline void setSpeed(float right, float left);
@@ -41,7 +42,7 @@ inline void sendEventFromISR(uint8_t id, portBASE_TYPE * higherPriorityTaskWoken
 #define POSITION_IN         (5)
 #define POSITION_OUT_LEFT   (6)
 #define POSITION_OUT_RIGHT  (7)
-#define POSITION_OUT_BOTH   (8)
+#define BACK_TO_CENTER      (8)
 
 short get_distance();
 

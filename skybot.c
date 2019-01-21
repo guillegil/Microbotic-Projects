@@ -160,6 +160,19 @@ void OpticalSensorsConf(void)
     GPIOIntEnable(OPTICAL_SENSORS_GPIO_BASE, ALL_OPTICAL_SENSOR_PINS);
     IntPrioritySet(INT_GPIOB, configMAX_SYSCALL_INTERRUPT_PRIORITY);
     IntEnable(INT_GPIOB);
+
+    SysCtlPeripheralEnable(FLOOR_SENSOR_GPIO_PERIPH);
+    while(!SysCtlPeripheralReady(FLOOR_SENSOR_GPIO_PERIPH))    // Wait for GPIO_PF to be ready
+
+    SysCtlPeripheralSleepEnable(FLOOR_SENSOR_GPIO_PERIPH);
+
+    GPIOPinTypeGPIOInput(FLOOR_SENSORS_GPIO_BASE, ALL_FLOOR_SENSORS);
+    GPIOIntTypeSet(FLOOR_SENSORS_GPIO_BASE, ALL_FLOOR_SENSORS, GPIO_BOTH_EDGES) ;
+    GPIOIntClear(FLOOR_SENSORS_GPIO_BASE, ALL_FLOOR_SENSORS);
+    GPIOIntEnable(FLOOR_SENSORS_GPIO_BASE, ALL_FLOOR_SENSORS);
+    IntPrioritySet(INT_GPIOD, configMAX_SYSCALL_INTERRUPT_PRIORITY);
+    IntEnable(INT_GPIOD);
+
 }
 
 
@@ -344,48 +357,46 @@ void ISR_WhiskerSensor(void)
 }
 
 
-void ISR_OpticalSensor(void)
+
+void ISR_FloorSensor(void)
 {
     portBASE_TYPE higherPriorityTaskWoken = pdFALSE;
 
 
-    if(GPIOIntStatus(OPTICAL_SENSORS_GPIO_BASE, FLOOR_SENSORS) == FLOOR_SENSORS)
+    if(GPIOPinRead(FLOOR_SENSORS_GPIO_BASE, RIGHT_FLOOR_SENSOR_PIN) != 0)
     {
-        if(GPIOPinRead(OPTICAL_SENSORS_GPIO_BASE, RIGHT_FLOOR_SENSOR_PIN))
-        {
-            sendEventFromISR(POSITION_OUT_RIGHT, &higherPriorityTaskWoken);
-            GPIOIntClear(OPTICAL_SENSORS_GPIO_BASE, RIGHT_FLOOR_SENSOR_PIN);
-        }else if(GPIOPinRead(OPTICAL_SENSORS_GPIO_BASE, LEFT_FLOOR_SENSOR_PIN))
-        {
-            sendEventFromISR(POSITION_OUT_LEFT, &higherPriorityTaskWoken);
-            GPIOIntClear(OPTICAL_SENSORS_GPIO_BASE, LEFT_FLOOR_SENSOR_PIN);
-        }else
-        {
-            sendEventFromISR(POSITION_IN, &higherPriorityTaskWoken);
-            GPIOIntClear(OPTICAL_SENSORS_GPIO_BASE, FLOOR_SENSORS);
-        }
+        sendEventFromISR(POSITION_OUT_RIGHT, &higherPriorityTaskWoken);
+        GPIOIntClear(FLOOR_SENSORS_GPIO_BASE, RIGHT_FLOOR_SENSOR_PIN);
+    }else if(GPIOPinRead(FLOOR_SENSORS_GPIO_BASE, LEFT_FLOOR_SENSOR_PIN) != 0)
+    {
+        sendEventFromISR(POSITION_OUT_LEFT, &higherPriorityTaskWoken);
+        GPIOIntClear(FLOOR_SENSORS_GPIO_BASE, LEFT_FLOOR_SENSOR_PIN);
+    }else
+    {
+        sendEventFromISR(POSITION_IN, &higherPriorityTaskWoken);
+        GPIOIntClear(FLOOR_SENSORS_GPIO_BASE, FLOOR_SENSORS);
+    }
 
 
-//        if(GPIOPinRead(OPTICAL_SENSORS_GPIO_BASE, FLOOR_SENSOR_PIN) == 0)
-//            sendEventFromISR(POSITION_IN, &higherPriorityTaskWoken);
-//        else
-//            sendEventFromISR(POSITION_OUT, &higherPriorityTaskWoken);
+}
 
 
+
+void ISR_OpticalSensor(void)
+{
+    portBASE_TYPE higherPriorityTaskWoken = pdFALSE;
+
+    if(GPIOIntStatus(OPTICAL_SENSORS_GPIO_BASE, RIGHT_ENCODER_PIN) == RIGHT_ENCODER_PIN)
+    {
+        registerStepFromISR(RIGHT_WHEEL, &higherPriorityTaskWoken);
+        GPIOIntClear(OPTICAL_SENSORS_GPIO_BASE, RIGHT_ENCODER_PIN);
     }
     else
     {
-        if(GPIOIntStatus(OPTICAL_SENSORS_GPIO_BASE, RIGHT_ENCODER_PIN) == RIGHT_ENCODER_PIN)
-        {
-            registerStepFromISR(RIGHT_WHEEL, &higherPriorityTaskWoken);
-            GPIOIntClear(OPTICAL_SENSORS_GPIO_BASE, RIGHT_ENCODER_PIN);
-        }
-        else
-        {
-            registerStepFromISR(LEFT_WHEEL, &higherPriorityTaskWoken);
-            GPIOIntClear(OPTICAL_SENSORS_GPIO_BASE, LEFT_ENCODER_PIN);
-        }
+        registerStepFromISR(LEFT_WHEEL, &higherPriorityTaskWoken);
+        GPIOIntClear(OPTICAL_SENSORS_GPIO_BASE, LEFT_ENCODER_PIN);
     }
+
     portEND_SWITCHING_ISR(higherPriorityTaskWoken);
 }
 

@@ -30,19 +30,26 @@
 #define ADC_PROX_GPIO_BASE          GPIO_PORTE_BASE
 #define ADC_PROX_GPIO_PIN           GPIO_PIN_3
 
-#define PWM_OUT_RIGHT_MOTOR         PWM_OUT_6       // Right wheel PWM output used in some PWM api functions
-#define PWM_OUT_LEFT_MOTOR          PWM_OUT_7       // Left wheel PWM output used in some PWM api functions
+#define PWM_OUT_RIGHT_MOTOR         PWM_OUT_7       // Right wheel PWM output used in some PWM api functions
+#define PWM_OUT_LEFT_MOTOR          PWM_OUT_6       // Left wheel PWM output used in some PWM api functions
 
 #define OPTICAL_SENSORS_GPIO_PERIPH SYSCTL_PERIPH_GPIOB
 #define OPTICAL_SENSORS_GPIO_BASE   GPIO_PORTB_BASE
 #define RIGHT_ENCODER_PIN           GPIO_PIN_1
-#define LEFT_ENCODER_PIN            GPIO_PIN_2
+#define LEFT_ENCODER_PIN            GPIO_PIN_6
+
+
+#define FLOOR_SENSOR_GPIO_PERIPH    SYSCTL_PERIPH_GPIOD
+#define FLOOR_SENSORS_GPIO_BASE     GPIO_PORTD_BASE
 #define RIGHT_FLOOR_SENSOR_PIN      GPIO_PIN_6
-#define LEFT_FLOOR_SENSOR_PIN       GPIO_PIN_7
+#define LEFT_FLOOR_SENSOR_PIN       GPIO_PIN_2
+#define ALL_FLOOR_SENSORS           (RIGHT_FLOOR_SENSOR_PIN | LEFT_FLOOR_SENSOR_PIN)
 
-#define FLOOR_SENSORS               (RIGHT_FLOOR_SENSOR_PIN | RIGHT_FLOOR_SENSOR_PIN)
 
-#define ALL_OPTICAL_SENSOR_PINS     (RIGHT_ENCODER_PIN | LEFT_ENCODER_PIN | RIGHT_FLOOR_SENSOR_PIN | LEFT_FLOOR_SENSOR_PIN)
+
+#define FLOOR_SENSORS               (RIGHT_FLOOR_SENSOR_PIN | LEFT_FLOOR_SENSOR_PIN)
+
+#define ALL_OPTICAL_SENSOR_PINS     (RIGHT_ENCODER_PIN | LEFT_ENCODER_PIN)
 
 #define REACTIVE_QUEUE_SIZE         (4)
 #define MOTION_QUEUE_SIZE           (3)

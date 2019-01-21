@@ -94,13 +94,19 @@ inline void setSpeed(float right, float left)
 
 inline void sendEvent(uint8_t id)
 {
-    struct EventCommand event = {id};
+    struct EventCommand event;
+    event.id = id;
+    event.move = 0;
+    event.turn = 0;
     xQueueSend(reactiveQueue, &event, portMAX_DELAY);
 }
 
 inline void sendEventFromISR(uint8_t id, portBASE_TYPE * higherPriorityTaskWoken)
 {
-    struct EventCommand event = {id};
+    struct EventCommand event;
+    event.id = id;
+    event.move = 0;
+    event.turn = 0;
     xQueueSendFromISR(reactiveQueue, &event, higherPriorityTaskWoken);
 }
 
@@ -126,7 +132,7 @@ inline int16_t getAngleToCenter(uint8_t quadrant, uint16_t ath, int16_t x, int16
    uint16_t alpha = 0;
 
    if(x != 0)
-       alpha = atan(y/x);
+       alpha = atan(y/x)*180/M_PI;
    else
        alpha = 0;
 
@@ -183,7 +189,7 @@ inline int16_t getAngleToCenter(uint8_t quadrant, uint16_t ath, int16_t x, int16
    return 0;
 }
 
-inline uint16_t getDistanceToCenter(float x, float y)
+inline uint16_t getDistanceToCenter(int16_t x, int16_t y)
 {
    return sqrt((x*x) + (y*y));
 }
@@ -385,7 +391,7 @@ static portTASK_FUNCTION(ReactiveTask, pvParameters)
 {
     struct EventCommand event;
     uint8_t state = TURN_STATE;
-    uint16_t last_turn, last_move;
+    uint16_t last_turn = 0, last_move = 0;
 
     turn(360);
 
@@ -397,53 +403,67 @@ static portTASK_FUNCTION(ReactiveTask, pvParameters)
             case UBOT_STOPPED:
                 switch(state)
                 {
-                    case TURN_STATE:
-                        turn(last_turn);
-                        state = MOVE_STATE;
-                        break;
                     case MOVE_STATE:
-                        move(last_move);
                         state = TURN_STATE;
+                        turn(360);
+                        vTaskResume(xArbiterTask);
+                        break;
+                    case TURN_STATE:
+                        state = MOVE_STATE;
+                        move(200);
+
+                        break;
+                    case INWARD_STATE:
+                        state = MOVE_STATE;
+                        move(200);
                         break;
                 }
                 break;
-            case COLLISION_START:
-                break;
-            case COLLISION_END:
-                break;
             case ENEMY_FOUND:
-                move(event.move);
+                state=MOVE_STATE;
+                move(10000);
                 break;
             case ENEMY_LOST:
-                turn(event.turn);
-                state = MOVE_STATE;
+                state = TURN_STATE;
+                turn(360);
 
                 break;
             case POSITION_OUT_LEFT:
+                vTaskSuspend(xArbiterTask);
                 vTaskSuspend(xProximityTask);
                 xQueueReset(reactiveQueue);
 
                 if(state == TURN_STATE)
                     turn(-135);             // For now does not change
 
-                state = MOVE_STATE;
+                state = INWARD_STATE;
                 break;
             case POSITION_OUT_RIGHT:
+                vTaskSuspend(xArbiterTask);
                 vTaskSuspend(xProximityTask);
                 xQueueReset(reactiveQueue);
 
                 if(state == TURN_STATE)
                     turn(135);              // For now does not change
 
-                state = MOVE_STATE;
+                state = INWARD_STATE;
                 break;
             case POSITION_IN:
                 vTaskResume(xProximityTask);
+                vTaskResume(xArbiterTask);
+                break;
+            case BACK_TO_CENTER:
+                vTaskSuspend(xArbiterTask);
+                turn(event.turn);
+                state = MOVE_STATE;
+
                 break;
         }
 
-        last_turn = event.turn;
-        last_move = event.move;
+        //last_turn = event.turn;
+        //last_move = event.move;
+
+        UARTprintf("Event: %d\n", event.id);
 
        SysCtlSleep();
     }
@@ -637,15 +657,19 @@ static portTASK_FUNCTION(proximityTask, pvParameters)
         xQueueReceive(proximityQueue, &data, portMAX_DELAY);
         distance = calculte_distance(data);
 
-        if(flag == 1 && (distance > 20 && distance < LUT_SIZE*20))
+        if(flag == 1 && (distance > 20 && distance < 200))
         {
             event.id = ENEMY_FOUND;
+            event.move = 0;
+            event.turn = 0;
             xQueueSend(reactiveQueue, &event, portMAX_DELAY);
             flag = 0;
         }
-        else if(flag == 0 && (distance <= 20 || distance >= LUT_SIZE*20))
+        else if(flag == 0 && (distance > 300))
         {
             event.id = ENEMY_LOST;
+            event.move = 0;
+            event.turn = 0;
             xQueueSend(reactiveQueue, &event, portMAX_DELAY);
             flag = 1;
         }
@@ -657,15 +681,25 @@ static portTASK_FUNCTION(arbiterTask, pvParameters)
     struct Positions pos;
     struct EventCommand evn;
 
-
+    uint16_t last_enemy_x, last_enemy_y;
+    uint8_t last_event;
 
     memset(&pos, 0, sizeof(struct Positions));
 
     while(true)
     {
         xQueueReceive(arbiterQueue, &pos, portMAX_DELAY);
-        evn.turn = getAngleToCenter(getQuadrant(pos.bot_x, pos.bot_y), pos.azimuthal, pos.bot_x, pos.bot_y);
 
+
+
+        evn.turn = getAngleToCenter(getQuadrant(pos.bot_x, pos.bot_y), pos.azimuthal*180/M_PI, pos.bot_x, pos.bot_y);
+        evn.move = getDistanceToCenter(pos.bot_x, pos.bot_y);
+        evn.id = BACK_TO_CENTER;
+
+        last_enemy_x = pos.enemy_x;
+        last_enemy_y = pos.enemy_y;
+
+        xQueueSend(reactiveQueue, &evn, portMAX_DELAY);
     }
 }
 
@@ -705,10 +739,6 @@ void init_tasks()
         while(1);
     }
 
-    if((xTaskCreate(arbiterTask, "arbiterTask", 256, NULL, tskIDLE_PRIORITY + 1, NULL)) != pdTRUE)
-    {
-        while(1);
-    }
 
     if((xTaskCreate(MappingTask, "mappingTask", 256, NULL, tskIDLE_PRIORITY + 1, NULL)) != pdTRUE)
     {
