@@ -50,11 +50,15 @@
 #define PROXIMITY_QUEUE_SIZE        (1)
 #define ARBITER_QUEUE_SIZE          (1)
 
-#define ENCODER_STRIPES             (36)
+#define ENCODER_STRIPES             (36.0f)
 #define WHEEL_DIAMETER              (59.0f)         // Millimeters
-#define WHEELS_SEPARATION           (93)            // Millimeters FIXME: MEASURE!!!!
-
+#define WHEELS_SEPARATION           (93.0f)         // Millimeters FIXME: MEASURE!!!!
+#define FLOOR_SENSOR_SEPARATION     (45.0f)         // Millimeters FIXME: MEASURE!!!!
 #define M_PI                        (3.14159f)      // Pi
+#define STEP_DISTANCE               (WHEEL_DIAMETER * M_PI / ENCODER_STRIPES)
+#define STEP_ANGLE_DEG              (WHEEL_DIAMETER * 360.0f / ENCODER_STRIPES / WHEELS_SEPARATION)
+#define STEP_ANGLE_RAD              (WHEEL_DIAMETER * 2.0f * M_PI / ENCODER_STRIPES / WHEELS_SEPARATION)
+
 
 #define TURN_STATE                  (0)
 #define MOVE_STATE                  (1)

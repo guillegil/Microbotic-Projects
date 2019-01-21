@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <float.h>
+#include <math.h>
 #include "driverlib/sysctl.h"
 #include "driverlib/pwm.h"
 //#include "driverlib/uart.h"
@@ -25,6 +27,8 @@
 
 #define LUT_SIZE    23
 
+#define UNKNOWN_VALUE   FLT_MAX
+
 
 extern void vUARTTask( void *pvParameters );
 
@@ -34,6 +38,7 @@ xQueueHandle SensorsQueue;
 xQueueHandle reactiveQueue;
 xQueueHandle motorsQueue;
 xQueueHandle motionQueue;
+xQueueHandle mappingQueue;
 xQueueHandle proximityQueue;
 xQueueHandle proximityQueue;
 xQueueHandle arbiterQueue;
@@ -56,6 +61,13 @@ struct MotionCommand
 #define REGISTER_STEP       (0)
 #define MOVE                (1)
 #define TURN                (2)
+
+struct MappingCommand
+{
+    uint8_t id;
+};
+#define INTERSECTION_RIGHT  (4)
+#define INTERSECTION_LEFT   (5)
 
 struct Speed
 {
@@ -207,6 +219,24 @@ void registerStepFromISR(int16_t wheel, portBASE_TYPE * higherPriorityTaskWoken)
     command.id = REGISTER_STEP;
     command.parameter = wheel;
     xQueueSendFromISR(motionQueue, &command, higherPriorityTaskWoken);
+}
+
+void sendMappingCommand(uint8_t id)
+{
+    struct MappingCommand command;
+    command.id = type;
+    xQueueSend(mappingQueue, &command, portMAX_DELAY);
+}
+
+void sendPositions(float bot_x, float bot_y, float bot_angle, float enemy_x, float enemy_y)
+{
+    struct Positions positions;
+    positions.bot_x = bot_x;
+    positions.bot_y = bot_y;
+    positions.bot_azimuthal = bot_angle;
+    positions.enemy_x = enemy_x;
+    positions.enemy_y = enemy_y;
+    xQueueSend(arbiterQueue, &positions, portMAX_DELAY);
 }
 
 // Utility functions
@@ -420,9 +450,124 @@ static portTASK_FUNCTION(ReactiveTask, pvParameters)
 }
 
 
+inline float middle_line_slope(float x1, float y1, float x2, float y2)
+{
+    return (x1 - x2) / (y2 - y1);
+}
+
+
+inline float middle_point(float x1, float x2)
+{
+    return x1 + (x2 - x1) / 2;
+}
+
+
+static portTASK_FUNCTION(MappingTask, pvParameters)
+{
+    float bot_x, bot_y, bot_angle;
+    float enemy_x, enemy_y;
+    float m_old, xm_old, ym_old;
+    float x_old, y_old;
+    bool enemy_found;
+    uint8_t saved_points;
+    struct MappingCommand command;
+
+    bot_x = 0.0f;
+    bot_y = 0.0f;
+    bot_angle = 0.0f;
+    enemy_x = UNKNOWN_VALUE;
+    enemy_y = UNKNOWN_VALUE;
+    x_old = UNKNOWN_VALUE;
+    y_old = UNKNOWN_VALUE;
+    m_old = UNKNOWN_VALUE;
+    xm_old = UNKNOWN_VALUE;
+    ym_old = UNKNOWN_VALUE;
+
+    enemy_found = false;
+    saved_points = 0;
+
+    while(true)
+    {
+        struct Positions pos;
+
+        xQueueReceive(MappingQueue, &command, portMAX_DELAY);
+
+        switch(command.id)
+        {
+            case FORWARD_MOTION:
+                bot_x += cosf(bot_angle) * STEP_DISTANCE;
+                bot_y += sinf(bot_angle) * STEP_DISTANCE;
+                break;
+            case BACKWARD_MOTION:
+                bot_x -= cosf(bot_angle) * STEP_DISTANCE;
+                bot_y -= sinf(bot_angle) * STEP_DISTANCE;
+                break;
+            case LEFT_MOTION:
+                bot_angle += STEP_ANGLE_RAD;
+                break;
+            case LEFT_MOTION:
+                bot_angle -= STEP_ANGLE_RAD;
+                break;
+        }
+
+        if(command.id == INTERSECTION_RIGHT  ||  command.id == INTERSECTION_LEFT)
+        {
+            if(command.id == INTERSECTION_RIGHT)
+            {
+                float x_new = bot_x + FLOOR_SENSOR_SEPARATION * sinf(bot_angle);
+                float y_new = bot_y + FLOOR_SENSOR_SEPARATION * cosf(bot_angle);
+            }
+            else
+            {
+                float x_new = bot_x - FLOOR_SENSOR_SEPARATION * sinf(bot_angle);
+                float y_new = bot_y - FLOOR_SENSOR_SEPARATION * cosf(bot_angle);
+            }
+
+            if(saved_points > 0)
+            {
+                float m_new = middle_line_slope(x_new, y_new, x_old, y_old);
+                float xm_new = middle_point(x_new, x_old);
+                float ym_new = middle_point(y_new, y_old);
+
+                if(saved_points > 1)
+                {
+                    float center_x = (m_new * xm_new - m_old * xm_old + ym_old - ym_new) / (m_new - m_old);
+                    float center_y = m_new * center_x + ym_new - m_new * xm_new;
+                    bot_x += center_x;
+                    bot_y += center_y;
+                    if(enemy_found)
+                    {
+                        enemy_x += center_x;
+                        enemy_y += center_y;
+                    }
+                }
+                else
+                {
+                    saved_points = 2;
+                }
+
+                m_old = m_new;
+                xm_old = xm_new;
+                ym_old = ym_new;
+            }
+            else
+            {
+                saved_points = 1;
+            }
+
+            x_old = x_new;
+            y_old = y_new;
+        }
+
+        sendPositions(bot_x, bot_y, bot_angle, enemy_x, enemy_y);
+    }
+}
+
+
 static portTASK_FUNCTION(MotionTask, pvParameters)
 {
-    uint32_t remain_right_increments, remain_left_increments;
+    unsigned remain_right_increments, remain_left_increments;
+    uint8_t motion;
     struct MotionCommand command;
 
     while(true)
@@ -432,24 +577,37 @@ static portTASK_FUNCTION(MotionTask, pvParameters)
         switch(command.id)
         {
             case MOVE:
-                remain_right_increments = (abs(command.parameter) * ENCODER_STRIPES) / (unsigned)(WHEEL_DIAMETER * M_PI);
-                remain_left_increments = (abs(command.parameter) * ENCODER_STRIPES) / (unsigned)(WHEEL_DIAMETER * M_PI);
+                remain_right_increments = (unsigned) abs(command.parameter) / STEP_DISTANCE;
+                remain_left_increments = remain_right_increments;
                 if(command.parameter > 0)
+                {
+                    motion = FORWARD_MOTION;
                     setSpeed(MAX_FORWARD_SPEED, MAX_FORWARD_SPEED);
+                }
                 else
+                {
+                    motion = BACKWARD_MOTION;
                     setSpeed(MAX_BACKWARD_SPEED, MAX_BACKWARD_SPEED);
+                }
                 break;
 
             case TURN:
-                remain_right_increments = (abs(command.parameter) * ENCODER_STRIPES * WHEELS_SEPARATION) / WHEEL_DIAMETER / 360;
-                remain_left_increments = (abs(command.parameter) * ENCODER_STRIPES * WHEELS_SEPARATION) / WHEEL_DIAMETER / 360;
+                remain_right_increments = (unsigned) abs(command.parameter / STEP_ANGLE_DEG;
+                remain_left_increments = remain_right_increments;
                 if(command.parameter > 0)
+                {
+                    motion = LEFT_MOTION
                     setSpeed(MAX_FORWARD_SPEED, MAX_BACKWARD_SPEED);
+                }
                 else
+                {
+                    motion  = RIGHT_MOTION;
                     setSpeed(MAX_BACKWARD_SPEED, MAX_FORWARD_SPEED);
+                }
                 break;
 
             case REGISTER_STEP:
+                sendMappingCommand(motion);
                 if(command.parameter == RIGHT_WHEEL)
                     remain_right_increments--;
                 else if(command.parameter == LEFT_WHEEL)
@@ -518,6 +676,7 @@ void init_tasks()
     motionQueue = xQueueCreate(MOTION_QUEUE_SIZE, sizeof(struct MotionCommand));
     proximityQueue = xQueueCreate(PROXIMITY_QUEUE_SIZE, sizeof(uint32_t));
     arbiterQueue = xQueueCreate(ARBITER_QUEUE_SIZE, sizeof(struct Positions));
+    mappingQueue
 
     if((xTaskCreate(vUARTTask, (portCHAR *)"Uart", 512,NULL,tskIDLE_PRIORITY + 1, NULL) != pdTRUE))
     {
@@ -545,6 +704,11 @@ void init_tasks()
     }
 
     if((xTaskCreate(arbiterTask, "arbiterTask", 256, NULL, tskIDLE_PRIORITY + 1, NULL)) != pdTRUE)
+    {
+        while(1);
+    }
+
+    if((xTaskCreate(MappingTask, "mappingTask", 256, NULL, tskIDLE_PRIORITY + 1, NULL)) != pdTRUE)
     {
         while(1);
     }

@@ -23,6 +23,12 @@ void registerStepFromISR(int16_t wheel, portBASE_TYPE * higherPriorityTaskWoken)
 #define RIGHT_WHEEL         (0)
 #define LEFT_WHEEL          (1)
 
+void recordStep(uint8_t motion_type);
+#define FORWARD_MOTION      (0)
+#define BACKWARD_MOTION     (1)
+#define RIGHT_MOTION        (2)
+#define LEFT_MOTION         (3)
+
 inline void sendEvent(uint8_t id);
 inline void sendEventFromISR(uint8_t id, portBASE_TYPE * higherPriorityTaskWoken);
 // id values
