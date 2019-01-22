@@ -406,7 +406,7 @@ static portTASK_FUNCTION(ReactiveTask, pvParameters)
                     case MOVE_STATE:
                         state = TURN_STATE;
                         turn(360);
-                        vTaskResume(xArbiterTask);
+//                        vTaskResume(xArbiterTask);
                         break;
                     case TURN_STATE:
                         state = MOVE_STATE;
@@ -420,40 +420,41 @@ static portTASK_FUNCTION(ReactiveTask, pvParameters)
                 }
                 break;
             case ENEMY_FOUND:
-                state=MOVE_STATE;
-                move(10000);
+                if(state != INWARD_STATE)
+                {
+                    state=MOVE_STATE;
+                    move(10000);
+                }
                 break;
             case ENEMY_LOST:
-                state = TURN_STATE;
-                turn(360);
-
+                if(state != INWARD_STATE)
+                {
+                    state = TURN_STATE;
+                    turn(360);
+                }
                 break;
             case POSITION_OUT_LEFT:
-                vTaskSuspend(xArbiterTask);
-                vTaskSuspend(xProximityTask);
-                xQueueReset(reactiveQueue);
+//                vTaskSuspend(xArbiterTask);
+//                vTaskSuspend(xProximityTask);
 
-                if(state == TURN_STATE)
-                    turn(-135);             // For now does not change
+                turn(-135);             // For now does not change
 
                 state = INWARD_STATE;
                 break;
             case POSITION_OUT_RIGHT:
-                vTaskSuspend(xArbiterTask);
-                vTaskSuspend(xProximityTask);
-                xQueueReset(reactiveQueue);
+//                vTaskSuspend(xArbiterTask);
+//                vTaskSuspend(xProximityTask);
 
-                if(state == TURN_STATE)
-                    turn(135);              // For now does not change
+                turn(135);              // For now does not change
 
                 state = INWARD_STATE;
                 break;
             case POSITION_IN:
-                vTaskResume(xProximityTask);
-                vTaskResume(xArbiterTask);
+//                vTaskResume(xProximityTask);
+//                vTaskResume(xArbiterTask);
                 break;
             case BACK_TO_CENTER:
-                vTaskSuspend(xArbiterTask);
+//                vTaskSuspend(xArbiterTask);
                 turn(event.turn);
                 state = MOVE_STATE;
 
@@ -629,7 +630,7 @@ static portTASK_FUNCTION(MotionTask, pvParameters)
                 break;
 
             case REGISTER_STEP:
-                sendMappingCommand(motion);
+                //sendMappingCommand(motion);
                 if(command.parameter == RIGHT_WHEEL)
                     remain_right_increments--;
                 else if(command.parameter == LEFT_WHEEL)
@@ -657,7 +658,7 @@ static portTASK_FUNCTION(proximityTask, pvParameters)
         xQueueReceive(proximityQueue, &data, portMAX_DELAY);
         distance = calculte_distance(data);
 
-        if(flag == 1 && (distance > 20 && distance < 200))
+        if(flag == 1 && (distance > 70 && distance < 150))
         {
             event.id = ENEMY_FOUND;
             event.move = 0;
@@ -665,7 +666,7 @@ static portTASK_FUNCTION(proximityTask, pvParameters)
             xQueueSend(reactiveQueue, &event, portMAX_DELAY);
             flag = 0;
         }
-        else if(flag == 0 && (distance > 300))
+        else if(flag == 0 && (distance > 350))
         {
             event.id = ENEMY_LOST;
             event.move = 0;
