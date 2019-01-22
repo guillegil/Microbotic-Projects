@@ -368,7 +368,6 @@ static portTASK_FUNCTION(ReactiveTask, pvParameters)
                     case MOVE_STATE:
                         state = TURN_STATE;
                         turn(turn_angle);
-//                        vTaskResume(xArbiterTask);
                         break;
 
                     case TURN_STATE:
@@ -380,7 +379,7 @@ static portTASK_FUNCTION(ReactiveTask, pvParameters)
             case ENEMY_FOUND:
                 if(state != LEFT_WHEEL_OUT_STATE  && state != RIGHT_WHEEL_OUT_STATE)
                 {
-                    state=MOVE_STATE;
+                    state = MOVE_STATE;
                     move(10000);
                 }
                 break;
@@ -396,25 +395,25 @@ static portTASK_FUNCTION(ReactiveTask, pvParameters)
             case POSITION_OUT_LEFT:
 //                vTaskSuspend(xArbiterTask);
 //                vTaskSuspend(xProximityTask);
-                turn(-wheel_out_angle);             // For now does not change
+                turn(-wheel_out_angle);
                 state = LEFT_WHEEL_OUT_STATE;
                 break;
 
             case POSITION_OUT_RIGHT:
-//                vTaskSuspend(xArbiterTask);
-//                vTaskSuspend(xProximityTask);
-                turn(wheel_out_angle);              // For now does not change
+                turn(wheel_out_angle);
                 state = RIGHT_WHEEL_OUT_STATE;
                 break;
 
             case POSITION_IN:
-//                vTaskResume(xProximityTask);
-//                vTaskResume(xArbiterTask);
                 if(state == LEFT_WHEEL_OUT_STATE)
                     turn(-wheel_in_angle);
                 else
                     turn(wheel_in_angle);
                 state = TURN_STATE;
+                break;
+            case UPDATE_VALUES:
+                move_distance = event.move;
+                turn_angle = event.turn;
                 break;
         }
 
@@ -612,7 +611,7 @@ static portTASK_FUNCTION(proximityTask, pvParameters)
         xQueueReceive(proximityQueue, &data, portMAX_DELAY);
         distance = calculte_distance(data);
 
-        if(flag == 1 && (distance > 70 && distance < 150))
+        if(flag == 1 && (distance > LOWER_PROXIMITY_THRESHOLD && distance < UPPER_PROXIMITY_THRESHOLD))
         {
             event.id = ENEMY_FOUND;
             event.move = 0;
@@ -620,7 +619,7 @@ static portTASK_FUNCTION(proximityTask, pvParameters)
             xQueueSend(reactiveQueue, &event, portMAX_DELAY);
             flag = 0;
         }
-        else if(flag == 0 && (distance > 350))
+        else if(flag == 0 && (distance > OVER_RANGE_THRESHOLD))
         {
             event.id = ENEMY_LOST;
             event.move = 0;
@@ -641,18 +640,25 @@ static portTASK_FUNCTION(arbiterTask, pvParameters)
 
     memset(&pos, 0, sizeof(struct Positions));
 
+    evn.id = UPDATE_VALUES;
+
     while(true)
     {
         xQueueReceive(arbiterQueue, &pos, portMAX_DELAY);
 
+        if((pos.bot_x > 50 || pos.bot_x < -50) || (pos.bot_y > 50 || pos.bot_y < -50))
+        {
+            evn.move = getDistanceToCenter(pos.bot_x, pos.bot_y);
+            evn.turn = getAngleToCenter(getQuadrant(pos.bot_x, pos.bot_y), pos.azimuthal*180/M_PI, pos.bot_x, pos.bot_y);
+        }else
+        {
+            evn.move = 0;
+            evn.turn = 360;
+        }
 
 
-        evn.turn = getAngleToCenter(getQuadrant(pos.bot_x, pos.bot_y), pos.azimuthal*180/M_PI, pos.bot_x, pos.bot_y);
-        evn.move = getDistanceToCenter(pos.bot_x, pos.bot_y);
-        evn.id = BACK_TO_CENTER;
-
-        last_enemy_x = pos.enemy_x;
-        last_enemy_y = pos.enemy_y;
+        // last_enemy_x = pos.enemy_x;
+        // last_enemy_y = pos.enemy_y;//                vTaskSuspend(xProximityTask);
 
         xQueueSend(reactiveQueue, &evn, portMAX_DELAY);
     }

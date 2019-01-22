@@ -30,6 +30,12 @@ void recordStep(uint8_t motion_type);
 #define RIGHT_MOTION        (2)
 #define LEFT_MOTION         (3)
 
+#define LOWER_PROXIMITY_THRESHOLD 40
+#define UPPER_PROXIMITY_THRESHOLD 150
+#define OVER_RANGE_THRESHOLD      350
+
+
+
 inline void sendEvent(uint8_t id);
 inline void sendEventFromISR(uint8_t id, portBASE_TYPE * higherPriorityTaskWoken);
 // id values
@@ -42,7 +48,7 @@ inline void sendEventFromISR(uint8_t id, portBASE_TYPE * higherPriorityTaskWoken
 #define POSITION_IN         (5)
 #define POSITION_OUT_LEFT   (6)
 #define POSITION_OUT_RIGHT  (7)
-#define BACK_TO_CENTER      (8)
+#define UPDATE_VALUES      (8)
 
 short get_distance();
 
