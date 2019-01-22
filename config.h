@@ -70,7 +70,8 @@
 
 #define TURN_STATE                  (0)
 #define MOVE_STATE                  (1)
-#define INWARD_STATE                (2)
+#define RIGHT_WHEEL_OUT_STATE       (2)
+#define LEFT_WHEEL_OUT_STATE        (3)
 
 #define PROXIMITY_CALIBRATION_SAMPLES   10
 

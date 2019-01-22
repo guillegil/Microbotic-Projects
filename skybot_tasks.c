@@ -246,52 +246,7 @@ void sendPositions(float bot_x, float bot_y, float bot_angle, float enemy_x, flo
 }
 
 // Utility functions
-void DodgeLeft()
-{
-    struct Speed speed;
-    vTaskDelay(100); // .5s delay
 
-    /****** Go Backward ******/
-    speed.left = -0.5f;
-    speed.right = -0.5f;
-
-    xQueueSend(motorsQueue, &speed, portMAX_DELAY);
-    vTaskDelay(1000); // 1s delay
-
-    /****** Turn left ******/
-
-    speed.left = 0.5f;
-    speed.right = -0.5f;
-
-    xQueueSend(motorsQueue, &speed, portMAX_DELAY);
-    vTaskDelay(500);
-
-    /****** Go Foreward ******/
-
-    speed.left = 0.5f;
-    speed.right = 0.5f;
-
-    xQueueSend(motorsQueue, &speed, portMAX_DELAY);
-    vTaskDelay(1500);
-
-    /****** Turn right ******/
-
-    speed.left = -0.5f;
-    speed.right = 0.5f;
-
-    xQueueSend(motorsQueue, &speed, portMAX_DELAY);
-    vTaskDelay(300);
-
-    /****** Go Foreward ******/
-
-    speed.left = 1.0f;
-    speed.right = 1.0f;
-
-    xQueueSend(motorsQueue, &speed, portMAX_DELAY);
-    vTaskDelay(1000);
-
-
-}
 
 short proximity_lut[LUT_SIZE] =
 {
@@ -301,8 +256,6 @@ short proximity_lut[LUT_SIZE] =
      420,  387,  378,  344,  318,
      316,  305,  291
 };
-
-
 
 
 uint16_t calculte_distance(uint32_t data)
@@ -390,9 +343,18 @@ static portTASK_FUNCTION(MotorsTask, pvParameters)
 static portTASK_FUNCTION(ReactiveTask, pvParameters)
 {
     struct EventCommand event;
-    uint8_t state = TURN_STATE;
-    uint16_t last_turn = 0, last_move = 0;
+    uint8_t state;
+    int16_t move_distance;
+    int16_t turn_angle;
+    int16_t wheel_out_angle;
+    int16_t wheel_in_angle;
 
+    move_distance = 200;
+    turn_angle = 340;
+    wheel_out_angle = 360;
+    wheel_in_angle = 30;
+
+    state = TURN_STATE;
     turn(360);
 
     while(true)
@@ -405,64 +367,56 @@ static portTASK_FUNCTION(ReactiveTask, pvParameters)
                 {
                     case MOVE_STATE:
                         state = TURN_STATE;
-                        turn(360);
+                        turn(turn_angle);
 //                        vTaskResume(xArbiterTask);
                         break;
+
                     case TURN_STATE:
                         state = MOVE_STATE;
-                        move(200);
-
-                        break;
-                    case INWARD_STATE:
-                        state = MOVE_STATE;
-                        move(200);
+                        move(move_distance);
                         break;
                 }
                 break;
             case ENEMY_FOUND:
-                if(state != INWARD_STATE)
+                if(state != LEFT_WHEEL_OUT_STATE  && state != RIGHT_WHEEL_OUT_STATE)
                 {
                     state=MOVE_STATE;
                     move(10000);
                 }
                 break;
+
             case ENEMY_LOST:
-                if(state != INWARD_STATE)
+                if(state != LEFT_WHEEL_OUT_STATE  && state != RIGHT_WHEEL_OUT_STATE)
                 {
                     state = TURN_STATE;
-                    turn(360);
+                    turn(turn_angle);
                 }
                 break;
+
             case POSITION_OUT_LEFT:
 //                vTaskSuspend(xArbiterTask);
 //                vTaskSuspend(xProximityTask);
-
-                turn(-135);             // For now does not change
-
-                state = INWARD_STATE;
+                turn(-wheel_out_angle);             // For now does not change
+                state = LEFT_WHEEL_OUT_STATE;
                 break;
+
             case POSITION_OUT_RIGHT:
 //                vTaskSuspend(xArbiterTask);
 //                vTaskSuspend(xProximityTask);
-
-                turn(135);              // For now does not change
-
-                state = INWARD_STATE;
+                turn(wheel_out_angle);              // For now does not change
+                state = RIGHT_WHEEL_OUT_STATE;
                 break;
+
             case POSITION_IN:
 //                vTaskResume(xProximityTask);
 //                vTaskResume(xArbiterTask);
-                break;
-            case BACK_TO_CENTER:
-//                vTaskSuspend(xArbiterTask);
-                turn(event.turn);
-                state = MOVE_STATE;
-
+                if(state == LEFT_WHEEL_OUT_STATE)
+                    turn(-wheel_in_angle);
+                else
+                    turn(wheel_in_angle);
+                state = TURN_STATE;
                 break;
         }
-
-        //last_turn = event.turn;
-        //last_move = event.move;
 
         UARTprintf("Event: %d\n", event.id);
 
