@@ -367,10 +367,12 @@ void ISR_FloorSensor(void)
     if(GPIOPinRead(FLOOR_SENSORS_GPIO_BASE, RIGHT_FLOOR_SENSOR_PIN) != 0)
     {
         sendEventFromISR(POSITION_OUT_RIGHT, &higherPriorityTaskWoken);
+        sendMappingCommandFromISR(INTERSECTION_RIGHT, &higherPriorityTaskWoken);
         GPIOIntClear(FLOOR_SENSORS_GPIO_BASE, RIGHT_FLOOR_SENSOR_PIN);
     }else if(GPIOPinRead(FLOOR_SENSORS_GPIO_BASE, LEFT_FLOOR_SENSOR_PIN) != 0)
     {
         sendEventFromISR(POSITION_OUT_LEFT, &higherPriorityTaskWoken);
+        sendMappingCommandFromISR(INTERSECTION_LEFT, &higherPriorityTaskWoken);
         GPIOIntClear(FLOOR_SENSORS_GPIO_BASE, LEFT_FLOOR_SENSOR_PIN);
     }else
     {

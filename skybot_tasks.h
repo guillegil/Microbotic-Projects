@@ -24,18 +24,6 @@ void registerStepFromISR(int16_t wheel, portBASE_TYPE * higherPriorityTaskWoken)
 #define RIGHT_WHEEL         (0)
 #define LEFT_WHEEL          (1)
 
-void recordStep(uint8_t motion_type);
-#define FORWARD_MOTION      (0)
-#define BACKWARD_MOTION     (1)
-#define RIGHT_MOTION        (2)
-#define LEFT_MOTION         (3)
-
-#define LOWER_PROXIMITY_THRESHOLD 40
-#define UPPER_PROXIMITY_THRESHOLD 150
-#define OVER_RANGE_THRESHOLD      350
-
-
-
 inline void sendEvent(uint8_t id);
 inline void sendEventFromISR(uint8_t id, portBASE_TYPE * higherPriorityTaskWoken);
 // id values
@@ -49,6 +37,16 @@ inline void sendEventFromISR(uint8_t id, portBASE_TYPE * higherPriorityTaskWoken
 #define POSITION_OUT_LEFT   (6)
 #define POSITION_OUT_RIGHT  (7)
 #define UPDATE_VALUES      (8)
+
+void sendMappingCommand(uint8_t id);
+void sendMappingCommandFromISR(uint8_t id, portBASE_TYPE * higherPriorityTaskWoken);
+// id values:
+#define FORWARD_MOTION      (0)
+#define BACKWARD_MOTION     (1)
+#define RIGHT_MOTION        (2)
+#define LEFT_MOTION         (3)
+#define INTERSECTION_RIGHT  (4)
+#define INTERSECTION_LEFT   (5)
 
 short get_distance();
 

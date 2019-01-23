@@ -66,8 +66,6 @@ struct MappingCommand
 {
     uint8_t id;
 };
-#define INTERSECTION_RIGHT  (4)
-#define INTERSECTION_LEFT   (5)
 
 struct Speed
 {
@@ -234,6 +232,13 @@ void sendMappingCommand(uint8_t id)
     xQueueSend(mappingQueue, &command, portMAX_DELAY);
 }
 
+void sendMappingCommandFromISR(uint8_t id, portBASE_TYPE * higherPriorityTaskWoken)
+{
+    struct MappingCommand command;
+    command.id = id;
+    xQueueSendFromISR(mappingQueue, &command, higherPriorityTaskWoken);
+}
+
 void sendPositions(float bot_x, float bot_y, float bot_angle, float enemy_x, float enemy_y)
 {
     struct Positions positions;
@@ -349,8 +354,8 @@ static portTASK_FUNCTION(ReactiveTask, pvParameters)
     int16_t wheel_out_angle;
     int16_t wheel_in_angle;
 
-    move_distance = 200;
-    turn_angle = 340;
+    move_distance = 50;
+    turn_angle = 360;
     wheel_out_angle = 360;
     wheel_in_angle = 30;
 
@@ -417,7 +422,7 @@ static portTASK_FUNCTION(ReactiveTask, pvParameters)
                 break;
         }
 
-        UARTprintf("Event: %d\n", event.id);
+        //UARTprintf("Event: %d\n", event.id);
 
        SysCtlSleep();
     }
@@ -435,13 +440,42 @@ inline float middle_point(float x1, float x2)
     return x1 + (x2 - x1) / 2;
 }
 
+inline float get_module(float x1, float y1, float x2, float y2)
+{
+    float x_dist;
+    float y_dist;
+
+    x_dist = x1 - x2;
+    y_dist = y1 - y2;
+
+    return sqrtf(x_dist * x_dist + y_dist * y_dist);
+}
+
+
+void get_center(float x1, float y1, float x2, float y2, float x3, float y3, float * center_x, float * center_y)
+{
+    float xm1, ym1, m1;
+    float xm2, ym2, m2;
+
+    xm1 = middle_point(x1, x2);
+    ym1 = middle_point(y1, y2);
+    m1 = middle_line_slope(x1, y1, x2, y2);
+
+    xm2 = middle_point(x2, x3);
+    ym2 = middle_point(y2, y3);
+    m2 = middle_line_slope(x2, y2, x3, y3);
+
+    *center_x = (m1 * xm1 - m2 * xm2 + ym2 - ym1) / (m1 - m2);
+    *center_y = m1 * *center_x + ym1 - m1 * xm1;
+}
+
 
 static portTASK_FUNCTION(MappingTask, pvParameters)
 {
     float bot_x, bot_y, bot_angle;
     float enemy_x, enemy_y;
-    float m_old, xm_old, ym_old;
     float x_old, y_old;
+    float x_new, y_new;
     bool enemy_found;
     uint8_t saved_points;
     struct MappingCommand command;
@@ -449,13 +483,6 @@ static portTASK_FUNCTION(MappingTask, pvParameters)
     bot_x = 0.0f;
     bot_y = 0.0f;
     bot_angle = 0.0f;
-    enemy_x = UNKNOWN_VALUE;
-    enemy_y = UNKNOWN_VALUE;
-    x_old = UNKNOWN_VALUE;
-    y_old = UNKNOWN_VALUE;
-    m_old = UNKNOWN_VALUE;
-    xm_old = UNKNOWN_VALUE;
-    ym_old = UNKNOWN_VALUE;
 
     enemy_found = false;
     saved_points = 0;
@@ -469,46 +496,45 @@ static portTASK_FUNCTION(MappingTask, pvParameters)
         switch(command.id)
         {
             case FORWARD_MOTION:
-                bot_x += cosf(bot_angle) * STEP_DISTANCE;
-                bot_y += sinf(bot_angle) * STEP_DISTANCE;
+                bot_x += cosf(bot_angle) * STEP_DISTANCE;// / 2.0f;
+                bot_y += sinf(bot_angle) * STEP_DISTANCE;// / 2.0f;
                 break;
             case BACKWARD_MOTION:
-                bot_x -= cosf(bot_angle) * STEP_DISTANCE;
-                bot_y -= sinf(bot_angle) * STEP_DISTANCE;
+                bot_x -= cosf(bot_angle) * STEP_DISTANCE;// / 2.0f;
+                bot_y -= sinf(bot_angle) * STEP_DISTANCE;// / 2.0f;
                 break;
             case LEFT_MOTION:
-                bot_angle += STEP_ANGLE_RAD;
+                bot_angle += STEP_ANGLE_RAD;// / 2.0f;
                 break;
             case RIGHT_MOTION:
-                bot_angle -= STEP_ANGLE_RAD;
+                bot_angle -= STEP_ANGLE_RAD;// / 2.0f;
                 break;
         }
 
         if(command.id == INTERSECTION_RIGHT  ||  command.id == INTERSECTION_LEFT)
         {
-            float x_new, y_new;
+            float x_current, y_current;
+            bool good_point;
 
             if(command.id == INTERSECTION_RIGHT)
             {
-                x_new = bot_x + FLOOR_SENSOR_SEPARATION * sinf(bot_angle);
-                y_new = bot_y + FLOOR_SENSOR_SEPARATION * cosf(bot_angle);
+                x_current = bot_x + FLOOR_SENSOR_SEPARATION * sinf(bot_angle);
+                y_current = bot_y + FLOOR_SENSOR_SEPARATION * cosf(bot_angle);
             }
             else
             {
-                x_new = bot_x - FLOOR_SENSOR_SEPARATION * sinf(bot_angle);
-                y_new = bot_y - FLOOR_SENSOR_SEPARATION * cosf(bot_angle);
+                x_current = bot_x - FLOOR_SENSOR_SEPARATION * sinf(bot_angle);
+                y_current = bot_y - FLOOR_SENSOR_SEPARATION * cosf(bot_angle);
             }
 
-            if(saved_points > 0)
-            {
-                float m_new = middle_line_slope(x_new, y_new, x_old, y_old);
-                float xm_new = middle_point(x_new, x_old);
-                float ym_new = middle_point(y_new, y_old);
+            good_point = get_module(x_current, y_current, x_new, y_new) > 100.0f &&  get_module(x_current, y_current, x_old, y_old) > 100.0f;
 
-                if(saved_points > 1)
+            if(saved_points == 2)
+            {
+                if(good_point)
                 {
-                    float center_x = (m_new * xm_new - m_old * xm_old + ym_old - ym_new) / (m_new - m_old);
-                    float center_y = m_new * center_x + ym_new - m_new * xm_new;
+                    float center_x, center_y;
+                    get_center(x_old, y_old, x_new, y_new, x_current, y_current, &center_x, &center_y);
                     bot_x += center_x;
                     bot_y += center_y;
                     if(enemy_found)
@@ -516,26 +542,27 @@ static portTASK_FUNCTION(MappingTask, pvParameters)
                         enemy_x += center_x;
                         enemy_y += center_y;
                     }
-                }
-                else
-                {
-                    saved_points = 2;
-                }
 
-                m_old = m_new;
-                xm_old = xm_new;
-                ym_old = ym_new;
+                    x_old = x_new;
+                    y_old = y_new;
+                    x_new = x_current;
+                    y_new = y_current;
+                }
             }
             else
             {
-                saved_points = 1;
-            }
+                saved_points++;
 
-            x_old = x_new;
-            y_old = y_new;
+                x_old = x_new;
+                y_old = y_new;
+                x_new = x_current;
+                y_new = y_current;
+            }
         }
 
-        sendPositions(bot_x, bot_y, bot_angle, enemy_x, enemy_y);
+        //sendPositions(bot_x, bot_y, bot_angle, enemy_x, enemy_y);
+
+        UARTprintf("x: %d   y: %d  angle: %d\n",(int)bot_x,(int)bot_y,(int)bot_angle);
     }
 }
 
@@ -583,7 +610,7 @@ static portTASK_FUNCTION(MotionTask, pvParameters)
                 break;
 
             case REGISTER_STEP:
-                //sendMappingCommand(motion);
+                sendMappingCommand(motion);
                 if(command.parameter == RIGHT_WHEEL)
                     remain_right_increments--;
                 else if(command.parameter == LEFT_WHEEL)
