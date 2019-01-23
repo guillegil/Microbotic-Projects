@@ -485,12 +485,12 @@ static portTASK_FUNCTION(MappingTask, pvParameters)
                 {
                     float center_x, center_y;
                     get_center(x_old, y_old, x_new, y_new, x_current, y_current, &center_x, &center_y);
-                    bot_x += center_x;
-                    bot_y += center_y;
+                    bot_x -= center_x;
+                    bot_y -= center_y;
                     if(enemy_found)
                     {
-                        enemy_x += center_x;
-                        enemy_y += center_y;
+                        enemy_x -= center_x;
+                        enemy_y -= center_y;
                     }
 
                     x_old = x_new;
@@ -684,10 +684,10 @@ void init_tasks()
         while(1);
     }
 
-    if((xTaskCreate(arbiterTask, "arbiterTask", 256, NULL, tskIDLE_PRIORITY + 1, NULL)) != pdTRUE)
-    {
-        while(1);
-    }
+//    if((xTaskCreate(arbiterTask, "arbiterTask", 256, NULL, tskIDLE_PRIORITY + 1, NULL)) != pdTRUE)
+//    {
+//        while(1);
+//    }
 
 
 }
