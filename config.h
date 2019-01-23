@@ -75,6 +75,7 @@
 #define MOVE_STATE                  (1)
 #define RIGHT_WHEEL_OUT_STATE       (2)
 #define LEFT_WHEEL_OUT_STATE        (3)
+#define WHEEL_GETTING_IN_STATE      (4)
 
 #define PROXIMITY_CALIBRATION_SAMPLES   10
 
