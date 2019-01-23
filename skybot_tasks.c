@@ -79,7 +79,7 @@ struct Positions
     int16_t bot_y;
     int16_t enemy_x;
     int16_t enemy_y;
-    uint16_t azimuthal;
+    int16_t azimuthal;
 };
 
 
@@ -99,6 +99,7 @@ inline void sendEvent(uint8_t id)
     xQueueSend(reactiveQueue, &event, portMAX_DELAY);
 }
 
+
 inline void sendEventFromISR(uint8_t id, portBASE_TYPE * higherPriorityTaskWoken)
 {
     struct EventCommand event;
@@ -108,88 +109,33 @@ inline void sendEventFromISR(uint8_t id, portBASE_TYPE * higherPriorityTaskWoken
     xQueueSendFromISR(reactiveQueue, &event, higherPriorityTaskWoken);
 }
 
-inline uint8_t getQuadrant(int16_t x, int16_t y)
+
+inline int16_t getAngleToCenter(float x, float y)
 {
-    if(x >= 0)
-    {
-        if(y > 0)
-            return 1;
-        else
-            return 4;
-    }else
-    {
-        if(y > 0)
-            return 2;
-        else
-            return 3;
-    }
-}
+   float angle;
 
-inline int16_t getAngleToCenter(uint8_t quadrant, uint16_t ath, int16_t x, int16_t y)
-{
-   uint16_t alpha = 0;
-
-   if(x != 0)
-       alpha = atan(y/x)*180/M_PI;
-   else
-       alpha = 0;
-
-   switch(quadrant)
+   if(x == 0)
    {
-       case 1:
-           if(ath >= 0 && ath <= 180)           // alpha > 0
-               return (270 - ath - alpha);
-           else
-           {
-               if(alpha != 0)
-                   return (180 - ath + alpha);
+       if(y > 0)
+           angle = M_PI / 2.0f;
+       else
+           angle = -M_PI / 2.0f;
+   }
+   else if(x > 0)
+   {
+       angle = atanf(y/x) + M_PI;
+   }
+   else
+   {
+       angle = atanf(y/x);
+   }
 
-               return (270 - ath);
-           }
-
-           break;
-       case 2:                                   // alpha < 0
-           if(ath >= 0 && ath <= 180)
-               return (-ath + alpha);
-
-           return (360 - ath + alpha);
-
-           break;
-       case 3:                                   // alpha > 0
-           if(ath >= 0 && ath <= 180)
-               return (-ath + alpha);
-
-           return (360- ath + alpha);
-
-           break;
-       case 4:                                  // alpha < 0
-           if(ath >= 0 && ath <= 180)
-           {
-               if(alpha != 0)
-                   return (180 - ath + alpha);
-               else
-                   return (-ath + 90);
-           }
-
-           if(alpha != 0)
-               return (90 - ath - alpha);
-           else
-               return (-ath + 90);
-
-           break;
-   };
-
-
-
-
-
-
-   return 0;
+   return angle * 180.0f / M_PI;
 }
 
 inline uint16_t getDistanceToCenter(int16_t x, int16_t y)
 {
-   return sqrt((x*x) + (y*y));
+   return sqrtf((x*x) + (y*y));
 }
 
 
@@ -354,7 +300,7 @@ static portTASK_FUNCTION(ReactiveTask, pvParameters)
     int16_t wheel_out_angle;
     int16_t wheel_in_angle;
 
-    move_distance = 50;
+    move_distance = 150;
     turn_angle = 360;
     wheel_out_angle = 360;
     wheel_in_angle = 30;
@@ -505,6 +451,10 @@ static portTASK_FUNCTION(MappingTask, pvParameters)
                 break;
             case LEFT_MOTION:
                 bot_angle += STEP_ANGLE_RAD;// / 2.0f;
+                if(bot_angle < 0)
+                    bot_angle += 2.0f * M_PI;
+                else if(bot_angle >= 2 * M_PI)
+                    bot_angle -= 2.0f * M_PI;
                 break;
             case RIGHT_MOTION:
                 bot_angle -= STEP_ANGLE_RAD;// / 2.0f;
@@ -560,7 +510,8 @@ static portTASK_FUNCTION(MappingTask, pvParameters)
             }
         }
 
-        //sendPositions(bot_x, bot_y, bot_angle, enemy_x, enemy_y);
+        if(saved_points == 2)
+            sendPositions(bot_x, bot_y, bot_angle * 180.0f / M_PI, enemy_x, enemy_y);
 
         UARTprintf("x: %d   y: %d  angle: %d\n",(int)bot_x,(int)bot_y,(int)bot_angle);
     }
@@ -662,8 +613,8 @@ static portTASK_FUNCTION(arbiterTask, pvParameters)
     struct Positions pos;
     struct EventCommand evn;
 
-    uint16_t last_enemy_x, last_enemy_y;
-    uint8_t last_event;
+//    uint16_t last_enemy_x, last_enemy_y;
+//    uint8_t last_event;
 
     memset(&pos, 0, sizeof(struct Positions));
 
@@ -676,8 +627,9 @@ static portTASK_FUNCTION(arbiterTask, pvParameters)
         if((pos.bot_x > 50 || pos.bot_x < -50) || (pos.bot_y > 50 || pos.bot_y < -50))
         {
             evn.move = getDistanceToCenter(pos.bot_x, pos.bot_y);
-            evn.turn = getAngleToCenter(getQuadrant(pos.bot_x, pos.bot_y), pos.azimuthal*180/M_PI, pos.bot_x, pos.bot_y);
-        }else
+            evn.turn = getAngleToCenter(pos.bot_x, pos.bot_y) - pos.azimuthal;
+        }
+        else
         {
             evn.move = 0;
             evn.turn = 360;
@@ -727,8 +679,12 @@ void init_tasks()
         while(1);
     }
 
-
     if((xTaskCreate(MappingTask, "mappingTask", 256, NULL, tskIDLE_PRIORITY + 1, NULL)) != pdTRUE)
+    {
+        while(1);
+    }
+
+    if((xTaskCreate(arbiterTask, "arbiterTask", 256, NULL, tskIDLE_PRIORITY + 1, NULL)) != pdTRUE)
     {
         while(1);
     }
