@@ -193,7 +193,7 @@ void sendPositions(float bot_x, float bot_y, float bot_angle, float enemy_x, flo
     positions.azimuthal = bot_angle;
     positions.enemy_x = enemy_x;
     positions.enemy_y = enemy_y;
-    xQueueSend(arbiterQueue, &positions, portMAX_DELAY);
+    //xQueueSend(arbiterQueue, &positions, portMAX_DELAY);
 }
 
 // Utility functions
@@ -363,12 +363,12 @@ static portTASK_FUNCTION(ReactiveTask, pvParameters)
                 state = TURN_STATE;
                 break;
             case UPDATE_VALUES:
-                move_distance = event.move;
-                turn_angle = event.turn;
+//                move_distance = event.move;
+//                turn_angle = event.turn;
                 break;
         }
 
-        //UARTprintf("Event: %d\n", event.id);
+        UARTprintf("Event: %d\n", event.id);
 
        SysCtlSleep();
     }
@@ -466,18 +466,21 @@ static portTASK_FUNCTION(MappingTask, pvParameters)
             float x_current, y_current;
             bool good_point;
 
-            if(command.id == INTERSECTION_RIGHT)
-            {
-                x_current = bot_x + FLOOR_SENSOR_SEPARATION * sinf(bot_angle);
-                y_current = bot_y + FLOOR_SENSOR_SEPARATION * cosf(bot_angle);
-            }
-            else
-            {
-                x_current = bot_x - FLOOR_SENSOR_SEPARATION * sinf(bot_angle);
-                y_current = bot_y - FLOOR_SENSOR_SEPARATION * cosf(bot_angle);
-            }
+//            if(command.id == INTERSECTION_RIGHT)
+//            {
+//                x_current = bot_x + FLOOR_SENSOR_SEPARATION * sinf(bot_angle);
+//                y_current = bot_y + FLOOR_SENSOR_SEPARATION * cosf(bot_angle);
+//            }
+//            else
+//            {
+//                x_current = bot_x - FLOOR_SENSOR_SEPARATION * sinf(bot_angle);
+//                y_current = bot_y - FLOOR_SENSOR_SEPARATION * cosf(bot_angle);
+//            }
 
-            good_point = get_module(x_current, y_current, x_new, y_new) > 100.0f &&  get_module(x_current, y_current, x_old, y_old) > 100.0f;
+            x_current = bot_x;
+            y_current = bot_y;
+
+            good_point = get_module(x_current, y_current, x_new, y_new) > 50.0f &&  get_module(x_current, y_current, x_old, y_old) > 50.0f;
 
             if(saved_points == 2)
             {
@@ -513,7 +516,7 @@ static portTASK_FUNCTION(MappingTask, pvParameters)
         if(saved_points == 2)
             sendPositions(bot_x, bot_y, bot_angle * 180.0f / M_PI, enemy_x, enemy_y);
 
-        UARTprintf("x: %d   y: %d  angle: %d\n",(int)bot_x,(int)bot_y,(int)bot_angle);
+        //UARTprintf("x: %d   y: %d  angle: %d\n",(int)bot_x,(int)bot_y,(int)bot_angle);
     }
 }
 
@@ -674,10 +677,10 @@ void init_tasks()
         while(1);
     }
 
-    if((xTaskCreate(proximityTask, "proximityTask", 256, NULL, tskIDLE_PRIORITY + 1, &xProximityTask)) != pdTRUE)
-    {
-        while(1);
-    }
+//    if((xTaskCreate(proximityTask, "proximityTask", 256, NULL, tskIDLE_PRIORITY + 1, &xProximityTask)) != pdTRUE)
+//    {
+//        while(1);
+//    }
 
     if((xTaskCreate(MappingTask, "mappingTask", 256, NULL, tskIDLE_PRIORITY + 1, NULL)) != pdTRUE)
     {
