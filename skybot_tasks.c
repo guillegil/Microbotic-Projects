@@ -349,7 +349,7 @@ static portTASK_FUNCTION(ReactiveTask, pvParameters)
     int16_t wheel_out_angle;
     int16_t wheel_in_angle;
 
-    move_distance = 200;
+    move_distance = 50;
     turn_angle = 340;
     wheel_out_angle = 360;
     wheel_in_angle = 30;
@@ -371,14 +371,14 @@ static portTASK_FUNCTION(ReactiveTask, pvParameters)
 //                        vTaskResume(xArbiterTask);
                         break;
 
-                    case TURN_STATE:
+                    case TURN_STATE: case WHEEL_GETTING_IN_STATE:
                         state = MOVE_STATE;
                         move(move_distance);
                         break;
                 }
                 break;
             case ENEMY_FOUND:
-                if(state != LEFT_WHEEL_OUT_STATE  && state != RIGHT_WHEEL_OUT_STATE)
+                if(state != LEFT_WHEEL_OUT_STATE  && state != RIGHT_WHEEL_OUT_STATE && state != WHEEL_GETTING_IN_STATE)
                 {
                     state=MOVE_STATE;
                     move(10000);
@@ -386,7 +386,7 @@ static portTASK_FUNCTION(ReactiveTask, pvParameters)
                 break;
 
             case ENEMY_LOST:
-                if(state != LEFT_WHEEL_OUT_STATE  && state != RIGHT_WHEEL_OUT_STATE)
+                if(state != LEFT_WHEEL_OUT_STATE  && state != RIGHT_WHEEL_OUT_STATE && state != WHEEL_GETTING_IN_STATE)
                 {
                     state = TURN_STATE;
                     turn(turn_angle);
@@ -414,7 +414,7 @@ static portTASK_FUNCTION(ReactiveTask, pvParameters)
                     turn(-wheel_in_angle);
                 else
                     turn(wheel_in_angle);
-                state = TURN_STATE;
+                state = WHEEL_GETTING_IN_STATE;
                 break;
         }
 
